@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Box, Card, CardContent, Typography } from "@mui/material";
 import { diagnoseNote } from "../utils/api";
 import { FALLBACK_REPORT } from "../utils/fallback";
 import DiagnoseAnimation from "../components/DiagnoseAnimation";
 
-/** 诊断阶段的步骤 */
 const STEPS = [
   { label: "解析笔记内容", icon: "📄", duration: 2000 },
   { label: "分析封面视觉", icon: "🎨", duration: 2500 },
@@ -19,7 +19,7 @@ const STEPS = [
 ];
 
 /**
- * 诊断过程页 - 展示动画并等待后端返回结果
+ * 诊断过程页
  */
 export default function Diagnosing() {
   const location = useLocation();
@@ -33,7 +33,8 @@ export default function Diagnosing() {
   } | null;
 
   const [currentStep, setCurrentStep] = useState(0);
-  const [error, setError] = useState("");
+  const apiDone = useRef(false);
+  const resultRef = useRef<{ report: unknown; isFallback: boolean } | null>(null);
 
   useEffect(() => {
     if (!params) {
@@ -52,28 +53,35 @@ export default function Diagnosing() {
           tags: params.tags,
           coverImage: params.coverFile ?? undefined,
         });
-        if (!cancelled) {
-          navigate("/report", { state: { report: result, params } });
-        }
+        resultRef.current = { report: result, isFallback: false };
       } catch (err) {
         console.warn("API 不可用，使用 fallback 数据", err);
-        if (!cancelled) {
-          navigate("/report", {
-            state: { report: FALLBACK_REPORT, params, isFallback: true },
-          });
-        }
+        resultRef.current = { report: FALLBACK_REPORT, isFallback: true };
       }
+      apiDone.current = true;
     };
 
     runDiagnosis();
 
-    // Advance animation steps independently
     const timer = setInterval(() => {
       setCurrentStep((prev) => {
-        if (prev >= STEPS.length - 1) {
+        if (apiDone.current && prev >= STEPS.length - 2) {
           clearInterval(timer);
-          return prev;
+          setTimeout(() => {
+            if (!cancelled && resultRef.current) {
+              navigate("/report", {
+                state: {
+                  report: resultRef.current.report,
+                  params,
+                  isFallback: resultRef.current.isFallback,
+                },
+              });
+            }
+          }, 800);
+          return STEPS.length - 1;
         }
+        if (prev >= STEPS.length - 1) return prev;
+        if (!apiDone.current && prev >= STEPS.length - 2) return prev;
         return prev + 1;
       });
     }, 2800);
@@ -87,25 +95,34 @@ export default function Diagnosing() {
   if (!params) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center">
-      <div className="max-w-md w-full mx-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-          <DiagnoseAnimation currentStep={currentStep} steps={STEPS} />
-
-          <div className="mt-6">
-            <p className="text-sm text-gray-400">正在诊断</p>
-            <p className="font-semibold text-gray-700 mt-1 truncate px-4">
-              「{params.title}」
-            </p>
-          </div>
-
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 rounded-lg text-red-600 text-sm">
-              {error}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(160deg, #ecfdf5 0%, #ffffff 50%, #f0fdfa 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Box sx={{ maxWidth: 440, width: "100%", mx: 2 }}>
+        <Card sx={{ p: { xs: 3, sm: 4 }, textAlign: "center" }}>
+          <CardContent>
+            <DiagnoseAnimation currentStep={currentStep} steps={STEPS} />
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="body2" color="text.secondary">
+                正在诊断
+              </Typography>
+              <Typography
+                variant="subtitle1"
+                fontWeight={600}
+                sx={{ mt: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", px: 2 }}
+              >
+                「{params.title || "截图识别中..."}」
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
+    </Box>
   );
 }

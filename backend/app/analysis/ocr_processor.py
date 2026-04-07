@@ -2,7 +2,10 @@
 OCR 处理模块
 对截图类输入提取文字内容。当前使用 LLM 视觉能力代替传统 OCR。
 """
+from __future__ import annotations
+
 import base64
+import os
 
 
 class OCRProcessor:
@@ -23,8 +26,9 @@ class OCRProcessor:
         b64_image = base64.b64encode(image_bytes).decode("utf-8")
 
         try:
+            ocr_model = os.getenv("LLM_MODEL", "gpt-4o")
             response = await client.chat.completions.create(
-                model="gpt-4o",
+                model=ocr_model,
                 messages=[
                     {
                         "role": "system",

@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Box, Typography, TextField, Button, Card, CardContent, Tabs, Tab,
+  Stack, Alert, CircularProgress, Chip,
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import LinkIcon from "@mui/icons-material/Link";
 import UploadZone from "../components/UploadZone";
 import CategorySelector from "../components/CategorySelector";
+import { parseLink } from "../utils/api";
 
 /**
  * 首页 - 笔记上传入口
@@ -13,161 +20,210 @@ export default function Home() {
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("food");
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [activeTab, setActiveTab] = useState<"text" | "image">("text");
+  const [tabIndex, setTabIndex] = useState(0);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState("");
 
-  const canSubmit = title.trim().length > 0;
+  const canSubmit = tabIndex === 1 ? coverFile !== null : title.trim().length > 0;
 
   const handleSubmit = () => {
-    const params = { title, content, tags, category, coverFile };
-    navigate("/diagnosing", { state: params });
+    navigate("/diagnosing", { state: { title, content, tags, category, coverFile } });
+  };
+
+  const handleParseLink = async () => {
+    if (!linkUrl.trim()) return;
+    setLinkLoading(true);
+    setLinkError("");
+    try {
+      const result = await parseLink(linkUrl);
+      if (result.success) {
+        setTitle(result.title);
+        setContent(result.content);
+        setTags(result.tags.join(","));
+        setTabIndex(0);
+      } else {
+        setLinkError(result.error || "解析失败，请手动输入");
+      }
+    } catch {
+      setLinkError("网络错误，请稍后重试或手动输入");
+    } finally {
+      setLinkLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(160deg, #ecfdf5 0%, #ffffff 50%, #f0fdfa 100%)",
+      }}
+    >
       {/* Header */}
-      <header className="pt-8 pb-4 text-center">
-        <div className="inline-flex items-center gap-2 mb-2">
-          <span className="text-4xl">💊</span>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+      <Box sx={{ pt: 6, pb: 2, textAlign: "center" }}>
+        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, mb: 1 }}>
+          <Typography fontSize={40}>💊</Typography>
+          <Typography
+            variant="h3"
+            fontWeight={800}
+            sx={{
+              background: "linear-gradient(135deg, #059669, #0d9488)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
             薯医 NoteRx
-          </h1>
-        </div>
-        <p className="text-gray-500 text-lg">你的笔记，值得被看见。</p>
-      </header>
+          </Typography>
+        </Box>
+        <Typography variant="subtitle1" color="text.secondary">
+          你的笔记，值得被看见。
+        </Typography>
+      </Box>
 
-      {/* Main Form */}
-      <main className="max-w-2xl mx-auto px-4 pb-12">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-          {/* Tab Selector */}
-          <div className="flex border-b border-gray-100">
-            <button
-              onClick={() => setActiveTab("text")}
-              className={`flex-1 py-3.5 text-sm font-medium transition-colors ${
-                activeTab === "text"
-                  ? "text-emerald-600 border-b-2 border-emerald-500 bg-emerald-50/50"
-                  : "text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              📝 粘贴文字
-            </button>
-            <button
-              onClick={() => setActiveTab("image")}
-              className={`flex-1 py-3.5 text-sm font-medium transition-colors ${
-                activeTab === "image"
-                  ? "text-emerald-600 border-b-2 border-emerald-500 bg-emerald-50/50"
-                  : "text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              📸 上传截图/封面
-            </button>
-          </div>
+      {/* 主表单 */}
+      <Box sx={{ maxWidth: 640, mx: "auto", px: 2, pb: 6 }}>
+        <Card>
+          <Tabs
+            value={tabIndex}
+            onChange={(_, v) => setTabIndex(v)}
+            variant="fullWidth"
+            sx={{
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              "& .MuiTab-root": { fontWeight: 600, py: 1.5 },
+            }}
+          >
+            <Tab label="📝 粘贴文字" />
+            <Tab label="📸 上传截图" />
+            <Tab label="🔗 粘贴链接" />
+          </Tabs>
 
-          <div className="p-6 space-y-5">
-            {/* Category Selector */}
-            <CategorySelector value={category} onChange={setCategory} />
+          <CardContent sx={{ p: 3 }}>
+            <Stack spacing={3}>
+              <CategorySelector value={category} onChange={setCategory} />
 
-            {activeTab === "text" ? (
-              <>
-                {/* Title */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    笔记标题 <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
+              {/* Tab 0: 文字 */}
+              {tabIndex === 0 && (
+                <>
+                  <TextField
+                    label="笔记标题"
+                    required
+                    fullWidth
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="输入你的笔记标题"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-gray-800"
-                    maxLength={100}
+                    slotProps={{ htmlInput: { maxLength: 100 } }}
+                    helperText={`${title.length}/100`}
                   />
-                  <p className="text-xs text-gray-400 mt-1 text-right">
-                    {title.length}/100
-                  </p>
-                </div>
-
-                {/* Content */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    笔记正文
-                  </label>
-                  <textarea
+                  <TextField
+                    label="笔记正文"
+                    fullWidth
+                    multiline
+                    rows={5}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="粘贴你的笔记正文（可选）"
-                    rows={6}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition-all resize-none text-gray-800"
                   />
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    标签
-                  </label>
-                  <input
-                    type="text"
+                  <TextField
+                    label="标签"
+                    fullWidth
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                     placeholder="用逗号分隔，如：美食分享,减脂餐,食谱"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-gray-800"
                   />
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Image Upload */}
-                <UploadZone onFileSelect={setCoverFile} />
-                {/* Still need title for image mode */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    笔记标题 <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
+                </>
+              )}
+
+              {/* Tab 1: 截图 */}
+              {tabIndex === 1 && (
+                <>
+                  <UploadZone onFileSelect={setCoverFile} />
+                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center", display: "block" }}>
+                    上传截图后可自动识别标题和正文（需后端 API 支持）
+                  </Typography>
+                  <TextField
+                    label="笔记标题（可选，留空则由 AI 自动识别）"
+                    fullWidth
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="输入你的笔记标题"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-gray-800"
+                    placeholder="留空将自动从截图中识别"
                   />
-                </div>
-              </>
-            )}
+                </>
+              )}
 
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className={`w-full py-3.5 rounded-xl font-semibold text-white text-lg transition-all ${
-                canSubmit
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-md hover:shadow-lg active:scale-[0.98]"
-                  : "bg-gray-300 cursor-not-allowed"
-              }`}
-            >
-              🔍 开始诊断
-            </button>
-          </div>
-        </div>
+              {/* Tab 2: 链接 */}
+              {tabIndex === 2 && (
+                <>
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <TextField
+                      fullWidth
+                      label="小红书笔记链接"
+                      value={linkUrl}
+                      onChange={(e) => setLinkUrl(e.target.value)}
+                      placeholder="粘贴小红书分享链接"
+                      slotProps={{ input: { startAdornment: <LinkIcon sx={{ mr: 1, color: "text.disabled" }} /> } }}
+                    />
+                    <Button
+                      variant="contained"
+                      disabled={linkLoading || !linkUrl.trim()}
+                      onClick={handleParseLink}
+                      sx={{ minWidth: 80, flexShrink: 0 }}
+                    >
+                      {linkLoading ? <CircularProgress size={22} color="inherit" /> : "解析"}
+                    </Button>
+                  </Box>
+                  {linkError && <Alert severity="error">{linkError}</Alert>}
+                  <Typography variant="caption" color="text.secondary">
+                    支持小红书笔记分享链接，解析后自动填充标题和内容
+                  </Typography>
+                  {title && (
+                    <Alert severity="success" icon={false}>
+                      <Typography variant="subtitle2">已解析内容：</Typography>
+                      <Typography variant="body2">标题：{title}</Typography>
+                      {tags && <Typography variant="caption">标签：{tags}</Typography>}
+                    </Alert>
+                  )}
+                </>
+              )}
 
-        {/* Feature Highlights */}
-        <div className="grid grid-cols-3 gap-3 mt-8">
+              {/* 提交按钮 */}
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth
+                disabled={!canSubmit}
+                onClick={handleSubmit}
+                startIcon={<SearchIcon />}
+                sx={{ py: 1.5, fontSize: "1.05rem" }}
+              >
+                开始诊断
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {/* 特色亮点 */}
+        <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 4, justifyContent: "center", flexWrap: "wrap" }}>
           {[
-            { icon: "🤖", label: "多Agent\n智能诊断" },
-            { icon: "📊", label: "真实数据\n量化对比" },
-            { icon: "💬", label: "AI模拟\n评论区" },
+            { icon: "🤖", label: "多Agent智能诊断" },
+            { icon: "📊", label: "真实数据量化对比" },
+            { icon: "💬", label: "AI模拟评论区" },
+            { icon: "⚔️", label: "Agent辩论机制" },
+            { icon: "✨", label: "一键优化建议" },
           ].map((f) => (
-            <div
+            <Chip
               key={f.label}
-              className="bg-white/80 backdrop-blur rounded-xl p-4 text-center border border-gray-100"
-            >
-              <span className="text-2xl">{f.icon}</span>
-              <p className="text-xs text-gray-500 mt-1.5 whitespace-pre-line">
-                {f.label}
-              </p>
-            </div>
+              label={`${f.icon} ${f.label}`}
+              variant="outlined"
+              sx={{ bgcolor: "rgba(255,255,255,0.8)", backdropFilter: "blur(4px)" }}
+            />
           ))}
-        </div>
-      </main>
-    </div>
+        </Stack>
+
+        <Typography component="p" variant="caption" color="text.disabled" sx={{ display: "block", textAlign: "center", mt: 4 }}>
+          薯医 NoteRx · AI 诊断仅供参考
+        </Typography>
+      </Box>
+    </Box>
   );
 }

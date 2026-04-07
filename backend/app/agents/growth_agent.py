@@ -2,6 +2,8 @@
 增长策略 Agent
 分析标签、发布时间、互动策略。
 """
+from __future__ import annotations
+
 import json
 
 from app.agents.base_agent import BaseAgent

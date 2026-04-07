@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, yxz]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python -c "from app.main import app; print('import ok')"
+      - name: Init test DB
+        run: |
+          cd ..
+          python scripts/init_db.py
+          python scripts/seed_data.py
+          python scripts/compute_baseline.py
+      - run: python -m pytest tests/ -v --tb=short
+        if: hashFiles('backend/tests/') != ''
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vite build

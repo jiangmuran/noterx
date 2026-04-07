@@ -2,6 +2,8 @@
 用户模拟 Agent
 模拟目标受众看到笔记的第一反应和评论。
 """
+from __future__ import annotations
+
 import json
 
 from app.agents.base_agent import BaseAgent

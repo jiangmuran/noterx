@@ -2,6 +2,8 @@
 视觉诊断 Agent
 分析封面构图、配色、视觉吸引力。
 """
+from __future__ import annotations
+
 import json
 
 from app.agents.base_agent import BaseAgent

@@ -1,47 +1,72 @@
+import { Box, Typography, Chip } from "@mui/material";
+
 interface Props {
   score: number;
   grade: string;
   title: string;
 }
 
-const GRADE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  S: { bg: "from-amber-400 to-orange-500", text: "text-white", label: "爆款潜力" },
-  A: { bg: "from-emerald-400 to-teal-500", text: "text-white", label: "表现优秀" },
-  B: { bg: "from-blue-400 to-indigo-500", text: "text-white", label: "中规中矩" },
-  C: { bg: "from-orange-400 to-red-400", text: "text-white", label: "需要优化" },
-  D: { bg: "from-red-500 to-rose-600", text: "text-white", label: "问题严重" },
+const GRADE_CONFIG: Record<string, { gradient: string; label: string }> = {
+  S: { gradient: "linear-gradient(135deg, #f59e0b, #f97316)", label: "爆款潜力" },
+  A: { gradient: "linear-gradient(135deg, #10b981, #14b8a6)", label: "表现优秀" },
+  B: { gradient: "linear-gradient(135deg, #3b82f6, #6366f1)", label: "中规中矩" },
+  C: { gradient: "linear-gradient(135deg, #f97316, #ef4444)", label: "需要优化" },
+  D: { gradient: "linear-gradient(135deg, #ef4444, #e11d48)", label: "问题严重" },
 };
 
 /**
  * 综合评分卡片
  */
 export default function ScoreCard({ score, grade, title }: Props) {
-  const style = GRADE_STYLES[grade] || GRADE_STYLES.B;
+  const config = GRADE_CONFIG[grade] || GRADE_CONFIG.B;
 
   return (
-    <div
-      className={`bg-gradient-to-br ${style.bg} rounded-2xl p-6 ${style.text} shadow-lg`}
+    <Box
+      sx={{
+        background: config.gradient,
+        borderRadius: 4,
+        p: 3,
+        color: "#fff",
+      }}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-white/80 text-sm">诊断笔记</p>
-          <p className="font-semibold text-lg mt-0.5 line-clamp-1">
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+            诊断笔记
+          </Typography>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            sx={{ mt: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
             「{title}」
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="text-5xl font-bold">{Math.round(score)}</div>
-          <p className="text-white/80 text-sm mt-0.5">/ 100</p>
-        </div>
-      </div>
+          </Typography>
+        </Box>
+        <Box sx={{ textAlign: "right", ml: 2 }}>
+          <Typography variant="h2" fontWeight={800} lineHeight={1}>
+            {Math.round(score)}
+          </Typography>
+          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+            / 100
+          </Typography>
+        </Box>
+      </Box>
 
-      <div className="mt-4 flex items-center gap-3">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-sm font-medium backdrop-blur">
-          <span className="text-lg">{grade}</span>
-          <span>级</span>
-        </span>
-        <span className="text-white/90 text-sm">{style.label}</span>
-      </div>
-    </div>
+      <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
+        <Chip
+          label={`${grade} 级`}
+          sx={{
+            bgcolor: "rgba(255,255,255,0.2)",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: "1rem",
+            backdropFilter: "blur(4px)",
+          }}
+        />
+        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+          {config.label}
+        </Typography>
+      </Box>
+    </Box>
   );
 }

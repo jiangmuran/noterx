@@ -33,6 +33,20 @@ export interface SimulatedComment {
   sentiment: "positive" | "negative" | "neutral";
 }
 
+export interface DebateEntry {
+  round: number;
+  agent_name: string;
+  kind: "agree" | "rebuttal" | "add";
+  text: string;
+}
+
+export interface CoverDirection {
+  layout: string;
+  color_scheme: string;
+  text_style: string;
+  tips: string[];
+}
+
 export interface DiagnoseResult {
   overall_score: number;
   grade: string;
@@ -45,9 +59,21 @@ export interface DiagnoseResult {
     expected_impact: string;
   }>;
   debate_summary: string;
+  debate_timeline: DebateEntry[];
   simulated_comments: SimulatedComment[];
   optimized_title?: string;
   optimized_content?: string;
+  cover_direction?: CoverDirection;
+}
+
+export interface ParseLinkResult {
+  success: boolean;
+  error?: string;
+  title: string;
+  content: string;
+  tags: string[];
+  cover_url: string;
+  note_id?: string;
 }
 
 /**
@@ -68,6 +94,14 @@ export async function diagnoseNote(
   const { data } = await api.post<DiagnoseResult>("/diagnose", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
+  return data;
+}
+
+/**
+ * 解析小红书链接
+ */
+export async function parseLink(url: string): Promise<ParseLinkResult> {
+  const { data } = await api.post<ParseLinkResult>("/parse-link", { url });
   return data;
 }
 

@@ -1,3 +1,5 @@
+import { Box, Typography, Chip, Stack } from "@mui/material";
+
 interface Props {
   value: string;
   onChange: (v: string) => void;
@@ -7,6 +9,9 @@ const CATEGORIES = [
   { id: "food", label: "美食", icon: "🍜" },
   { id: "fashion", label: "穿搭", icon: "👗" },
   { id: "tech", label: "科技", icon: "📱" },
+  { id: "travel", label: "旅行", icon: "✈️" },
+  { id: "beauty", label: "美妆", icon: "💄" },
+  { id: "fitness", label: "健身", icon: "💪" },
 ];
 
 /**
@@ -14,26 +19,27 @@ const CATEGORIES = [
  */
 export default function CategorySelector({ value, onChange }: Props) {
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
+    <Box>
+      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
         选择垂类
-      </label>
-      <div className="grid grid-cols-3 gap-3">
+      </Typography>
+      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
         {CATEGORIES.map((cat) => (
-          <button
+          <Chip
             key={cat.id}
+            label={`${cat.icon} ${cat.label}`}
+            variant={value === cat.id ? "filled" : "outlined"}
+            color={value === cat.id ? "primary" : "default"}
             onClick={() => onChange(cat.id)}
-            className={`py-3 px-4 rounded-xl border-2 text-center transition-all ${
-              value === cat.id
-                ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
-                : "border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200"
-            }`}
-          >
-            <span className="text-2xl block">{cat.icon}</span>
-            <span className="text-sm font-medium mt-1 block">{cat.label}</span>
-          </button>
+            sx={{
+              fontWeight: 600,
+              fontSize: "0.85rem",
+              py: 2.5,
+              px: 0.5,
+            }}
+          />
         ))}
-      </div>
-    </div>
+      </Stack>
+    </Box>
   );
 }

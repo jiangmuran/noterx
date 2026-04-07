@@ -2,6 +2,8 @@
 综合裁判 Agent
 汇总各 Agent 观点，处理分歧，输出最终诊断报告。
 """
+from __future__ import annotations
+
 import json
 
 from app.agents.base_agent import BaseAgent

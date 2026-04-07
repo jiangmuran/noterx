@@ -33,6 +33,22 @@ class SimulatedComment(BaseModel):
     sentiment: str
 
 
+class DebateEntry(BaseModel):
+    """辩论时间线中的单条记录"""
+    round: int
+    agent_name: str
+    kind: str
+    text: str
+
+
+class CoverDirection(BaseModel):
+    """封面方向建议"""
+    layout: str = ""
+    color_scheme: str = ""
+    text_style: str = ""
+    tips: list[str] = []
+
+
 class DiagnoseResponse(BaseModel):
     """诊断报告响应体"""
     overall_score: float
@@ -42,6 +58,8 @@ class DiagnoseResponse(BaseModel):
     issues: list[dict]
     suggestions: list[dict]
     debate_summary: str
+    debate_timeline: list[DebateEntry] = []
     simulated_comments: list[SimulatedComment]
     optimized_title: Optional[str] = None
     optimized_content: Optional[str] = None
+    cover_direction: Optional[CoverDirection] = None

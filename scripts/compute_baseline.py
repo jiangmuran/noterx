@@ -121,7 +121,57 @@ def compute_for_category(cursor, category):
     viral_rate = (viral_count / total_count * 100) if total_count else 0
     upsert_stat(cursor, category, "viral_rate", round(viral_rate, 1))
 
-    print(f"  [{category}] 已计算 baseline 指标")
+    # --- 粉丝分层统计 ---
+    fan_buckets = [
+        ("nano", 0, 1000),
+        ("micro", 1000, 10000),
+        ("mid", 10000, 100000),
+        ("macro", 100000, 10**9),
+    ]
+    fan_stats = []
+    for label, lo, hi in fan_buckets:
+        cursor.execute("""
+            SELECT COUNT(*), AVG(likes + collects + comments),
+                   AVG(CASE WHEN is_viral=1 THEN 1.0 ELSE 0.0 END)
+            FROM notes WHERE category=? AND followers >= ? AND followers < ?
+        """, (category, lo, hi))
+        cnt, avg_eng, vr = cursor.fetchone()
+        fan_stats.append({
+            "bucket": label,
+            "range": f"{lo}-{hi}",
+            "count": cnt or 0,
+            "avg_engagement": round(avg_eng or 0, 1),
+            "viral_rate": round((vr or 0) * 100, 1),
+        })
+    upsert_stat(cursor, category, "fan_bucket_stats",
+                metric_json=json.dumps(fan_stats, ensure_ascii=False))
+
+    # --- 标签数量分桶 vs 互动率 ---
+    cursor.execute("""
+        SELECT tags, likes + collects + comments as eng
+        FROM notes WHERE category=?
+    """, (category,))
+    tag_buckets: dict[str, list[float]] = {}
+    for (tags_json, eng) in cursor.fetchall():
+        try:
+            n = len(json.loads(tags_json))
+        except (json.JSONDecodeError, TypeError):
+            n = 0
+        bucket = f"{n}" if n <= 8 else "9+"
+        tag_buckets.setdefault(bucket, []).append(eng)
+
+    tag_bucket_stats = []
+    for bucket in sorted(tag_buckets.keys(), key=lambda x: int(x.replace("+", ""))):
+        vals = tag_buckets[bucket]
+        tag_bucket_stats.append({
+            "tag_count": bucket,
+            "note_count": len(vals),
+            "avg_engagement": round(sum(vals) / len(vals), 1) if vals else 0,
+        })
+    upsert_stat(cursor, category, "tag_count_vs_engagement",
+                metric_json=json.dumps(tag_bucket_stats, ensure_ascii=False))
+
+    print(f"  [{category}] 已计算 baseline 指标（含粉丝分层与标签分桶）")
 
 
 def main():

@@ -1,13 +1,14 @@
+import { Box, Typography, Stack, Paper } from "@mui/material";
 import type { SimulatedComment } from "../utils/api";
 
 interface Props {
   comments: SimulatedComment[];
 }
 
-const SENTIMENT_STYLES = {
-  positive: "bg-emerald-50 border-emerald-200",
-  negative: "bg-red-50 border-red-200",
-  neutral: "bg-gray-50 border-gray-200",
+const SENTIMENT_COLORS: Record<string, string> = {
+  positive: "#f0fdf4",
+  negative: "#fef2f2",
+  neutral: "#f9fafb",
 };
 
 /**
@@ -15,28 +16,41 @@ const SENTIMENT_STYLES = {
  */
 export default function SimulatedComments({ comments }: Props) {
   if (!comments.length) {
-    return <p className="text-sm text-gray-400">暂无模拟评论</p>;
+    return (
+      <Typography variant="body2" color="text.secondary">
+        暂无模拟评论
+      </Typography>
+    );
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-gray-400">
+    <Stack spacing={1.5}>
+      <Typography variant="caption" color="text.secondary">
         以下评论由 AI 模拟生成，预测真实用户可能的反应
-      </p>
+      </Typography>
       {comments.map((c, i) => (
-        <div
+        <Paper
           key={i}
-          className={`flex items-start gap-3 p-3 rounded-xl border ${
-            SENTIMENT_STYLES[c.sentiment] || SENTIMENT_STYLES.neutral
-          }`}
+          variant="outlined"
+          sx={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 1.5,
+            p: 2,
+            bgcolor: SENTIMENT_COLORS[c.sentiment] || SENTIMENT_COLORS.neutral,
+          }}
         >
-          <span className="text-2xl shrink-0">{c.avatar_emoji}</span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-700">{c.username}</p>
-            <p className="text-sm text-gray-600 mt-0.5">{c.comment}</p>
-          </div>
-        </div>
+          <Typography fontSize={28} lineHeight={1}>
+            {c.avatar_emoji}
+          </Typography>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle2">{c.username}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+              {c.comment}
+            </Typography>
+          </Box>
+        </Paper>
       ))}
-    </div>
+    </Stack>
   );
 }
