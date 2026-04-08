@@ -13,6 +13,8 @@ interface UploadZoneProps {
   onFilesChange: (files: File[]) => void;
   /** Max number of files allowed */
   maxFiles?: number;
+  /** Desktop compact mode: denser grid and smaller empty state */
+  compact?: boolean;
 }
 
 function formatSize(size: number): string {
@@ -35,6 +37,7 @@ export default function UploadZone({
   files = [],
   onFilesChange,
   maxFiles = 9,
+  compact = false,
 }: UploadZoneProps) {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [isDragging, setIsDragging] = useState(false);
@@ -156,9 +159,11 @@ export default function UploadZone({
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 1,
-                  p: 1.5,
+                  gridTemplateColumns: compact ? "repeat(4, 1fr)" : "repeat(3, 1fr)",
+                  gap: compact ? 0.75 : 1,
+                  p: compact ? 1 : 1.5,
+                  maxHeight: compact ? 220 : "none",
+                  overflowY: compact ? "auto" : "visible",
                 }}
               >
                 {files.map((f, idx) => {
@@ -237,14 +242,21 @@ export default function UploadZone({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: 28, gap: 6, cursor: "pointer" }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                padding: compact ? 16 : 28,
+                gap: compact ? 4 : 6,
+                cursor: "pointer",
+              }}
               onClick={() => inputRef.current?.click()}
             >
-              <CloudUploadIcon sx={{ fontSize: 36, color: "#ccc" }} />
-              <Typography sx={{ color: "#666", fontWeight: 500, fontSize: "0.85rem", mt: 0.5 }}>
+              <CloudUploadIcon sx={{ fontSize: compact ? 30 : 36, color: "#ccc" }} />
+              <Typography sx={{ color: "#666", fontWeight: 500, fontSize: compact ? "0.8rem" : "0.85rem", mt: 0.5, textAlign: "center" }}>
                 拖拽、点击或 Ctrl+V 上传（支持多选）
               </Typography>
-              <Typography sx={{ color: "#bbb", fontSize: "0.75rem" }}>
+              <Typography sx={{ color: "#bbb", fontSize: compact ? "0.7rem" : "0.75rem", textAlign: "center" }}>
                 图片（JPG/PNG/WebP，最多 {maxFiles} 张）或视频（MP4/MOV，1 个）
               </Typography>
             </motion.div>
