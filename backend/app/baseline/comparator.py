@@ -120,6 +120,23 @@ class BaselineComparator:
 
         comparisons["viral_rate"] = stats.get("viral_rate", 0)
 
+        # Compute avg_engagement from component stats if not directly available
+        avg_engagement = stats.get("avg_engagement")
+        if avg_engagement is None:
+            avg_likes = stats.get("avg_likes", 0) or 0
+            avg_collects = stats.get("avg_collects", 0) or 0
+            avg_comments = stats.get("avg_comments", 0) or 0
+            avg_engagement = round(avg_likes + avg_collects + avg_comments, 1)
+        comparisons["avg_engagement"] = avg_engagement
+
+        viral_engagement = None
+        vl = stats.get("viral_avg_likes", 0) or 0
+        vc = stats.get("viral_avg_collects", 0) or 0
+        vco = stats.get("viral_avg_comments", 0) or 0
+        if vl or vc or vco:
+            viral_engagement = round(vl + vc + vco, 1)
+        comparisons["viral_engagement"] = viral_engagement
+
         return {
             "category": category,
             "comparisons": comparisons,
