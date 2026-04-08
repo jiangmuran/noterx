@@ -57,7 +57,7 @@ export default function Home() {
   const recognizeInFlightRef = useRef<Set<string>>(new Set());
   const prevPendingRecognitionRef = useRef(false);
 
-  useEffect(() => { document.title = "启医 NoteRx"; }, []);
+  useEffect(() => { document.title = "薯医 NoteRx"; }, []);
 
   useEffect(() => {
     return () => {
@@ -135,12 +135,6 @@ export default function Home() {
       if (!bestCategory && r.category?.trim()) bestCategory = r.category.trim();
       if (!bestSummary && r.summary?.trim()) bestSummary = r.summary.trim();
     }
-    if (!bestTitle || !bestContent) {
-      for (const [, r] of successRecogEntries) {
-        if (!bestTitle && r.title?.trim()) bestTitle = r.title.trim();
-        if (!bestContent && r.content_text?.trim()) bestContent = r.content_text.trim();
-      }
-    }
 
     return { bestTitle, bestContent, bestCategory, bestSummary };
   }, [successRecogEntries]);
@@ -168,11 +162,10 @@ export default function Home() {
   }, [imageFileKeys, aiRecogs, aiLoading]);
 
   useEffect(() => {
-    const { bestTitle, bestContent, bestCategory, bestSummary } = aggregated;
+    const { bestTitle, bestContent, bestCategory } = aggregated;
 
-    if (!userEdited.title) {
-      const fillTitle = bestTitle || bestSummary;
-      if (fillTitle) setTitle(fillTitle.slice(0, 100));
+    if (!userEdited.title && bestTitle) {
+      setTitle(bestTitle.slice(0, 100));
     }
     if (!userEdited.content && bestContent) {
       setContent(bestContent);
@@ -284,12 +277,14 @@ export default function Home() {
     );
     const hasAny = files.length > 0;
     const hasBody = Boolean(content.trim() || aggregated.bestContent);
+    const hasDetail = recognizedSlots.has("content");
     const hasCover = recognizedSlots.has("cover");
     const hasProfile = recognizedSlots.has("profile");
     const hasComments = recognizedSlots.has("comments");
 
     if (!hasAny) setAiSuggestion("");
-    else if (!hasBody) setAiSuggestion("AI 尚未识别到笔记正文，建议补充包含标题/正文/标签的截图。");
+    else if (!hasDetail) setAiSuggestion("未检测到笔记详情页截图，请上传包含标题+正文/标签的详情页，AI 才会提取笔记内容。");
+    else if (!hasBody) setAiSuggestion("已检测到详情页，但正文仍不清晰，建议补充一张更清晰的详情截图。");
     else if (!hasCover) setAiSuggestion("可补充封面截图，提升视觉内容判断。");
     else if (!hasProfile) setAiSuggestion("可补充主页截图，帮助判断账号定位。");
     else if (!hasComments) setAiSuggestion("可补充评论区截图，分析互动质量。");
@@ -337,7 +332,6 @@ export default function Home() {
 
   const lockInputs = !!processingStatus && processingStatus.label !== "已就绪";
   const isFormBlocked = files.length > 0 && !allRecognitionDone;
-  const canSubmit = files.length > 0 && title.trim().length > 0 && !lockInputs && !isFormBlocked;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -359,6 +353,8 @@ export default function Home() {
     ),
     [successRecogEntries],
   );
+  const hasDetailScreenshot = recognizedSlots.has("content");
+  const canSubmit = files.length > 0 && title.trim().length > 0 && !lockInputs && !isFormBlocked && hasDetailScreenshot;
   const slotLabelMap: Record<string, string> = {
     content: "详情",
     cover: "封面",
@@ -621,7 +617,7 @@ export default function Home() {
                 WebkitTextFillColor: "transparent",
               }}
             >
-              启医 NoteRx
+              薯医 NoteRx
             </Typography>
             <Typography sx={{ fontSize: "0.72rem", color: "text.secondary", lineHeight: 1.35, opacity: 0.92 }}>
               一次上传素材 → AI 自动识别 → 一键诊断
@@ -731,13 +727,20 @@ export default function Home() {
                 </Box>
               </Box>
             </Box>
-            <Box sx={{ pt: 1.5, flexShrink: 0 }}>{submitBtn}</Box>
+            <Box sx={{ pt: 1.5, flexShrink: 0 }}>
+              {submitBtn}
+              {files.length > 0 && allRecognitionDone && !hasDetailScreenshot && (
+                <Alert severity="warning" sx={{ mt: 1 }}>
+                  未检测到“笔记详情页”截图，暂不支持提交。请补充上传后再继续。
+                </Alert>
+              )}
+            </Box>
           </Paper>
         </Box>
       </Box>
 
       <Typography sx={{ flexShrink: 0, textAlign: "center", pb: 1, fontSize: "0.65rem", color: "text.disabled", letterSpacing: "0.04em" }}>
-        启医 NoteRx · AI 诊断仅供参考
+        薯医 NoteRx · AI 诊断仅供参考
       </Typography>
     </Box>
   );
@@ -802,10 +805,15 @@ export default function Home() {
             </Box>
           </Box>
           {submitBtn}
+          {files.length > 0 && allRecognitionDone && !hasDetailScreenshot && (
+            <Alert severity="warning">
+              未检测到“笔记详情页”截图，暂不支持提交。请补充上传后再继续。
+            </Alert>
+          )}
         </Stack>
       </Paper>
       <Typography sx={{ mt: 3, fontSize: "0.72rem", color: "text.disabled", letterSpacing: "0.03em" }}>
-        启医 NoteRx · AI 诊断仅供参考
+        薯医 NoteRx · AI 诊断仅供参考
       </Typography>
     </Box>
   );
