@@ -18,7 +18,13 @@ logger = logging.getLogger("noterx.ocr")
 class OCRProcessor:
     """从图片中提取文本内容。"""
 
-    async def extract_text(self, image_bytes: bytes, client=None) -> dict:
+    async def extract_text(
+        self,
+        image_bytes: bytes,
+        client=None,
+        *,
+        max_tokens_override: int | None = None,
+    ) -> dict:
         if client is None:
             return self._fallback_result()
 
@@ -47,12 +53,13 @@ class OCRProcessor:
                     {"role": "user", "content": msg_body},
                 ],
             }
+            env_cap = int(os.getenv("LLM_OCR_MAX_TOKENS", "1500"))
+            if max_tokens_override is not None:
+                env_cap = min(env_cap, max_tokens_override)
             if _is_mimo_openai_compat():
-                kwargs["max_completion_tokens"] = min(
-                    int(os.getenv("LLM_OCR_MAX_TOKENS", "1500")), 4096
-                )
+                kwargs["max_completion_tokens"] = min(env_cap, 4096)
             else:
-                kwargs["max_tokens"] = 1500
+                kwargs["max_tokens"] = min(env_cap, 4096)
 
             response = await client.chat.completions.create(**kwargs)
             raw = response.choices[0].message.content or ""

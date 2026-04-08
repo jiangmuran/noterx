@@ -34,6 +34,8 @@ const CAT_MAP: Record<string, string> = {
   "beauty": "beauty", "fitness": "fitness", "lifestyle": "lifestyle", "home": "home",
 };
 
+/** 快识并行路数：略限流可减少总排队，利于接近「单张 <5s」的体感 */
+const QUICK_RECOGNIZE_CONCURRENCY = 2;
 
 /** 首页：桌面端双栏布局，移动端单页布局 */
 export default function Home() {
@@ -244,12 +246,15 @@ export default function Home() {
   }, [files]);
 
   useEffect(() => {
-    files.forEach((file) => {
-      if (!file.type.startsWith("image/")) return;
-      const key = fkey(file);
-      if (!aiRecogs[key] && !aiLoading[key]) {
-        void runRecognition(file);
-      }
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    const inFlight = imageFiles.filter((f) => aiLoading[fkey(f)]).length;
+    const freeSlots = Math.max(0, QUICK_RECOGNIZE_CONCURRENCY - inFlight);
+    const need = imageFiles.filter((f) => {
+      const k = fkey(f);
+      return !aiRecogs[k] && !aiLoading[k];
+    });
+    need.slice(0, freeSlots).forEach((file) => {
+      void runRecognition(file);
     });
   }, [files, aiRecogs, aiLoading, runRecognition]);
 

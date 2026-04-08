@@ -8,9 +8,11 @@ import json
 import logging
 import os
 import re
+from io import BytesIO
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from PIL import Image
 
 from app.agents.base_agent import _get_client, _is_mimo_openai_compat
 
@@ -111,28 +113,81 @@ def _normalize_slot_type(raw: object) -> str:
     return alias_map.get(text, "other")
 
 
-async def _vision_call(client, prompt: str, image_bytes: bytes) -> dict:
+def _prepare_quick_recognize_image(image_bytes: bytes) -> tuple[bytes, str]:
+    """
+    快识前压缩：限制长边、输出 JPEG，降低上传与视觉推理耗时；小图保持原字节与 MIME。
+    @returns (image_bytes, image_mime)
+    """
+    max_edge = int(os.getenv("QUICK_RECOGNIZE_MAX_EDGE", "1280"))
+    quality = int(os.getenv("QUICK_RECOGNIZE_JPEG_QUALITY", "90"))
+    mime_map = {
+        "JPEG": "image/jpeg",
+        "PNG": "image/png",
+        "WEBP": "image/webp",
+        "GIF": "image/gif",
+        "MPO": "image/jpeg",
+    }
+    if max_edge <= 0:
+        try:
+            im0 = Image.open(BytesIO(image_bytes))
+            fmt0 = (im0.format or "PNG").upper()
+            return image_bytes, mime_map.get(fmt0, "image/png")
+        except Exception:
+            return image_bytes, "image/png"
+    try:
+        im = Image.open(BytesIO(image_bytes))
+        if im.mode in ("RGBA", "P"):
+            im = im.convert("RGB")
+        elif im.mode != "RGB":
+            im = im.convert("RGB")
+        w, h = im.size
+        fmt = (im.format or "PNG").upper()
+        mime = mime_map.get(fmt, "image/png")
+        if max(w, h) <= max_edge:
+            return image_bytes, mime
+        im.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+        buf = BytesIO()
+        im.save(buf, format="JPEG", quality=quality, optimize=True)
+        return buf.getvalue(), "image/jpeg"
+    except Exception as e:
+        logger.warning("快识缩图跳过，使用原图: %s", e)
+        return image_bytes, "image/png"
+
+
+async def _vision_call(
+    client,
+    prompt: str,
+    image_bytes: bytes,
+    *,
+    model: str | None = None,
+    max_out_tokens: int | None = None,
+    image_mime: str = "image/png",
+) -> dict:
     """调用多模态模型进行图片分析。"""
     b64 = base64.b64encode(image_bytes).decode("utf-8")
-    model = os.getenv("LLM_MODEL_OMNI", "mimo-v2-omni")
+    resolved_model = model or os.getenv("LLM_MODEL_OMNI", "mimo-v2-omni")
+    out_cap = max_out_tokens if max_out_tokens is not None else 2048
 
     kwargs = {
-        "model": model,
+        "model": resolved_model,
         "messages": [
             {"role": "system", "content": prompt},
             {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": "请分析这张截图。"},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{image_mime};base64,{b64}"},
+                    },
                 ],
             },
         ],
     }
     if _is_mimo_openai_compat():
-        kwargs["max_completion_tokens"] = 2048
+        kwargs["max_completion_tokens"] = out_cap
     else:
-        kwargs["max_tokens"] = 2048
+        kwargs["max_tokens"] = out_cap
 
     resp = await client.chat.completions.create(**kwargs)
     raw = resp.choices[0].message.content or ""
@@ -159,17 +214,32 @@ async def quick_recognize(
     if file.content_type and file.content_type not in ALLOWED_IMAGE_MIME:
         raise HTTPException(400, f"不支持的图片格式: {file.content_type}")
 
-    image_bytes = await file.read()
-    if len(image_bytes) > MAX_IMAGE_SIZE:
+    image_bytes_raw = await file.read()
+    if len(image_bytes_raw) > MAX_IMAGE_SIZE:
         raise HTTPException(400, "图片不能超过 10MB")
+
+    image_bytes, image_mime = _prepare_quick_recognize_image(image_bytes_raw)
 
     client = _get_client()
     prompt = _QUICK_PROMPT
     if slot_hint and slot_hint in SLOT_LABELS:
         prompt += f"\n提示：用户表明这是一张「{SLOT_LABELS[slot_hint]}」。"
 
+    quick_model = (os.getenv("LLM_MODEL_QUICK_RECOGNIZE") or "").strip() or os.getenv(
+        "LLM_MODEL_OMNI", "mimo-v2-omni"
+    )
+    quick_max_out = int(os.getenv("QUICK_RECOGNIZE_MAX_COMPLETION_TOKENS", "640"))
+    ocr_cap = int(os.getenv("QUICK_RECOGNIZE_OCR_MAX_TOKENS", "512"))
+
     try:
-        result = await _vision_call(client, prompt, image_bytes)
+        result = await _vision_call(
+            client,
+            prompt,
+            image_bytes,
+            model=quick_model,
+            max_out_tokens=quick_max_out,
+            image_mime=image_mime,
+        )
         slot_type = _normalize_slot_type(result.get("slot_type", ""))
         result["slot_type"] = slot_type
         if slot_type != "content":
@@ -184,7 +254,9 @@ async def quick_recognize(
                     from app.analysis.ocr_processor import OCRProcessor
 
                     ocr = OCRProcessor()
-                    ocr_result = await ocr.extract_text(image_bytes, client)
+                    ocr_result = await ocr.extract_text(
+                        image_bytes, client, max_tokens_override=ocr_cap
+                    )
                     ocr_title = str(ocr_result.get("title", "")).strip()
                     ocr_content = str(ocr_result.get("content", "")).strip()
                     ocr_tags = ocr_result.get("tags", [])
