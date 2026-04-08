@@ -28,10 +28,12 @@ import { showToast } from "../components/Toast";
 const card = {
   bgcolor: "#fff",
   border: "1px solid #f0f0f0",
-  borderRadius: "16px",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.03)",
+  borderRadius: "18px",
+  boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
   p: { xs: 2.5, md: 3 },
 };
+
+const sectionGap = 2.5;
 
 export default function Report() {
   const location = useLocation();
@@ -123,11 +125,11 @@ export default function Report() {
         </Box>
       )}
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}>
         <Box sx={{ maxWidth: 960, mx: "auto", px: { xs: 2, md: 3 }, mt: 2.5 }}>
 
-          {/* Row 1: Score + Dimension Bars + Radar — 3 columns on desktop */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" }, gap: 2, mb: 2 }}>
+          {/* Row 1: Score + Radar side by side, Dimension Bars below */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" }, gap: sectionGap, mb: sectionGap }}>
             <Box sx={card}>
               <ScoreCard score={report.overall_score} grade={report.grade} title={params.title} />
             </Box>
@@ -142,7 +144,7 @@ export default function Report() {
           </Box>
 
           {/* Row 2: Baseline comparison + Suggestions side by side */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 3fr" }, gap: 2, mb: 2 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 3fr" }, gap: sectionGap, mb: sectionGap }}>
             <Box sx={card}>
               <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626", mb: 2 }}>基线对比</Typography>
               <BaselineComparison category={params.category} userTitle={params.title} userTags={userTags} />
@@ -158,7 +160,7 @@ export default function Report() {
 
           {/* Row 3: Optimized content */}
           {(report.optimized_title || report.optimized_content || report.cover_direction) && (
-            <Box sx={{ ...card, mb: 2 }}>
+            <Box sx={{ ...card, mb: sectionGap }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                 <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626" }}>AI 优化方案</Typography>
                 {report.optimized_title && report.optimized_content && (
@@ -221,7 +223,7 @@ export default function Report() {
           )}
 
           {/* Row 4: Agent debate + Comments */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "3fr 2fr" }, gap: 2, mb: 2 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "3fr 2fr" }, gap: sectionGap, mb: sectionGap }}>
             <Box sx={card}>
               <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626", mb: 2 }}>Agent 诊断详情</Typography>
               <AgentDebate opinions={report.agent_opinions} summary={report.debate_summary} timeline={report.debate_timeline} />

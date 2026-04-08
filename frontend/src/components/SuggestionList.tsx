@@ -33,6 +33,11 @@ export default function SuggestionList({ suggestions }: Props) {
             sx={{
               borderLeft: `3px solid ${color}`,
               pl: 2,
+              py: 0.75,
+              borderRadius: "0 10px 10px 0",
+              bgcolor: `${color}08`,
+              transition: "background-color 0.2s ease",
+              "&:hover": { bgcolor: `${color}12` },
             }}
           >
             <Typography sx={{ fontSize: 14, color: "#505050", lineHeight: 1.6 }}>

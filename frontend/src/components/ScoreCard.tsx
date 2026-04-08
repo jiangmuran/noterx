@@ -42,33 +42,39 @@ export default function ScoreCard({ score, grade, title }: Props) {
   }, [score]);
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 2, gap: 0.75 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 2.5, gap: 1 }}>
       <Typography
         sx={{
-          fontSize: { xs: 48, md: 56 },
+          fontSize: { xs: 52, md: 64 },
           fontWeight: 800,
           lineHeight: 1,
-          color: "#262626",
           fontVariantNumeric: "tabular-nums",
+          background: `linear-gradient(135deg, ${config.color} 0%, #262626 100%)`,
+          backgroundClip: "text",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
         }}
       >
         {display}
       </Typography>
 
-      <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, mt: 0.5 }}>
-        <Box sx={{ px: 1.5, py: 0.4, borderRadius: "8px", bgcolor: config.bg }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: config.color }}>
+      <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{
+          px: 1.5, py: 0.4, borderRadius: "10px", bgcolor: config.bg,
+          boxShadow: `0 0 12px ${config.color}18`,
+        }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 800, color: config.color, letterSpacing: "0.02em" }}>
             {grade}
           </Typography>
         </Box>
-        <Typography sx={{ fontSize: 13, color: "#999" }}>
+        <Typography sx={{ fontSize: 13, color: "#888", fontWeight: 500 }}>
           {config.label}
         </Typography>
       </Box>
 
       <Typography
         sx={{
-          fontSize: 13, color: "#bbb", mt: 0.5,
+          fontSize: 13, color: "#bbb", mt: 0.25,
           maxWidth: 360, textAlign: "center",
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}

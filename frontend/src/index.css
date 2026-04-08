@@ -56,3 +56,22 @@ img {
   height: auto;
   display: block;
 }
+
+/* ── Shimmer animation for progress bars ── */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* ── Subtle pulse for active elements ── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 36, 66, 0.15); }
+  50% { box-shadow: 0 0 20px rgba(255, 36, 66, 0.3); }
+}
+
+/* ── Safe area for mobile bottom bar ── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-bottom-bar {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+}

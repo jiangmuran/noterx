@@ -49,14 +49,15 @@ export default function DimensionBars({ data }: Props) {
                 </Typography>
               </Box>
             </Box>
-            <Box sx={{ height: 6, bgcolor: "#f0f0f0", borderRadius: 3, overflow: "hidden" }}>
+            <Box sx={{ height: 7, bgcolor: "rgba(0,0,0,0.04)", borderRadius: 4, overflow: "hidden" }}>
               <Box
                 sx={{
                   height: "100%",
                   bgcolor: dim.color,
-                  borderRadius: 3,
+                  borderRadius: 4,
                   width: animated ? `${score}%` : "0%",
-                  transition: "width 1s cubic-bezier(0.25,0.46,0.45,0.94)",
+                  transition: "width 1.2s cubic-bezier(0.2,0,0.2,1)",
+                  boxShadow: animated ? `0 0 8px ${dim.color}30` : "none",
                 }}
               />
             </Box>

@@ -116,6 +116,16 @@ const CATEGORY_LABEL: Record<string, string> = {
   lifestyle: "生活", home: "家居",
 };
 
+
+/* ── Agent status config ── */
+const AGENTS = [
+  { name: "content", label: "内容分析师", activeStep: 4, doneStep: 5 },
+  { name: "visual", label: "视觉诊断师", activeStep: 4, doneStep: 6 },
+  { name: "growth", label: "增长策略师", activeStep: 4, doneStep: 7 },
+  { name: "user", label: "用户模拟器", activeStep: 4, doneStep: 8 },
+  { name: "judge", label: "综合裁判", activeStep: 9, doneStep: 10 },
+];
+
 /* ── Score ring component ── */
 function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
   const r = (size - 8) / 2;
@@ -280,259 +290,339 @@ export default function Diagnosing() {
   if (!params) return null;
 
   const progress = ((step + 1) / STEPS.length) * 100;
-  const tagList = params.tags ? params.tags.split(",").filter(Boolean) : [];
+
+  const currentStep = STEPS[Math.min(step, STEPS.length - 1)];
 
   return (
-    <Box sx={{ position: "fixed", inset: 0, bgcolor: "#fafafa", overflow: "auto" }}>
-      <Box
-        sx={{
-          maxWidth: 880, mx: "auto", px: { xs: 2, md: 3 }, py: { xs: 3, md: 5 },
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-          gap: { xs: 1.5, md: 2 },
-          minHeight: "100vh", alignContent: "start",
-        }}
-      >
-        {/* ── Model A Pre-Score Card (instant) ── */}
-        <AnimatePresence>
-          {preScoreData && (
+    <Box sx={{
+      position: "fixed", inset: 0,
+      background: "linear-gradient(180deg, #fafafa 0%, #f5f3f7 50%, #fafafa 100%)",
+      display: "flex", flexDirection: "column", overflow: "auto",
+    }}>
+      {/* ── Top bar ── */}
+      <Box sx={{
+        flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between",
+        px: { xs: 2, md: 3 }, py: 1.25,
+        borderBottom: "1px solid rgba(0,0,0,0.05)",
+        bgcolor: "rgba(255,255,255,0.7)", backdropFilter: "blur(16px)",
+        position: "sticky", top: 0, zIndex: 10,
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, flex: 1 }}>
+          {/* Pulsing dot */}
+          <motion.div
+            animate={{ scale: [1, 1.4, 1], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            style={{ flexShrink: 0 }}
+          >
+            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#ff2442" }} />
+          </motion.div>
+          <Box sx={{ px: 0.75, py: 0.25, borderRadius: "6px", bgcolor: "#fff0f1", border: "1px solid #ffe0e3", flexShrink: 0 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#ff2442" }}>
+              {CATEGORY_LABEL[params.category] || params.category}
+            </Typography>
+          </Box>
+          <Typography sx={{
+            fontSize: 13, fontWeight: 600, color: "#262626",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {params.title || "截图识别中..."}
+          </Typography>
+          {params.coverFile?.type?.startsWith("video/") && (
+            <Box sx={{ px: 0.5, py: 0.125, borderRadius: "4px", bgcolor: "#fff0f1", flexShrink: 0 }}>
+              <Typography sx={{ fontSize: 10, fontWeight: 600, color: "#ff2442" }}>视频</Typography>
+            </Box>
+          )}
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0, ml: 1 }}>
+          <Typography sx={{ fontSize: 11, color: "#bbb" }}>
+            {streamMsg || "预计 30-60s"}
+          </Typography>
+          <Box sx={{
+            px: 0.75, py: 0.25, borderRadius: "6px",
+            bgcolor: "rgba(0,0,0,0.04)",
+          }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#666", fontVariantNumeric: "tabular-nums" }}>
+              {elapsed}s
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* ── Main ── */}
+      <Box sx={{
+        flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+        px: { xs: 2, md: 3 }, py: { xs: 2.5, md: 3.5 }, gap: { xs: 2, md: 2.5 },
+        maxWidth: 640, mx: "auto", width: "100%",
+      }}>
+
+        {/* ── Score area: placeholder or actual ring ── */}
+        <AnimatePresence mode="wait">
+          {preScoreData ? (
             <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              style={{ gridColumn: "1 / -1" }}
+              key="score"
+              initial={{ opacity: 0, scale: 0.8, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: [0.2, 0, 0.2, 1] }}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: "100%" }}
             >
-              <Box sx={{
-                bgcolor: "#fff", border: "1px solid #e8f5e9", borderRadius: "16px",
-                p: { xs: 2, md: 2.5 }, display: "flex", gap: { xs: 2, md: 3 }, alignItems: "center",
-                flexWrap: { xs: "wrap", md: "nowrap" },
-                background: "linear-gradient(135deg, #f0fdf4 0%, #fff 100%)",
-              }}>
-                {/* Score ring */}
-                <Box sx={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <ScoreRing score={preScoreData.total_score} size={76} />
-                  <Typography sx={{ fontSize: 11, color: "#10b981", fontWeight: 600, mt: 0.5 }}>
-                    快速评估
+              <ScoreRing score={preScoreData.total_score} size={130} />
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", justifyContent: "center" }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#262626" }}>
+                  {preScoreData.category_cn}品类
+                </Typography>
+                <Box sx={{
+                  px: 0.75, py: 0.2, borderRadius: "8px",
+                  bgcolor: preScoreData.total_score >= 85 ? "#dcfce7" : preScoreData.total_score >= 70 ? "#fef3c7" : "#fee2e2",
+                }}>
+                  <Typography sx={{
+                    fontSize: 12, fontWeight: 700,
+                    color: preScoreData.total_score >= 85 ? "#16a34a" : preScoreData.total_score >= 70 ? "#d97706" : "#dc2626",
+                  }}>
+                    {preScoreData.level}
                   </Typography>
                 </Box>
-
-                {/* Dimension bars */}
-                <Box sx={{ flex: 1, minWidth: 200 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#262626" }}>
-                      {preScoreData.category_cn}品类 · 基于 874 条数据的快速评估
-                    </Typography>
-                    <Box sx={{ px: 0.75, py: 0.125, borderRadius: "6px", bgcolor: preScoreData.total_score >= 85 ? "#dcfce7" : preScoreData.total_score >= 70 ? "#fef3c7" : "#fee2e2" }}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: preScoreData.total_score >= 85 ? "#16a34a" : preScoreData.total_score >= 70 ? "#d97706" : "#dc2626" }}>
-                        {preScoreData.level}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {Object.entries(preScoreData.dimensions).map(([key, val]) => (
-                    <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.4 }}>
-                      <Typography sx={{ fontSize: 11, color: "#999", minWidth: 55, textAlign: "right" }}>
-                        {DIM_LABELS[key] || key}
-                      </Typography>
-                      <Box sx={{ flex: 1, height: 6, bgcolor: "#f0f0f0", borderRadius: 3, overflow: "hidden" }}>
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${val}%` }}
-                          transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-                          style={{
-                            height: "100%", borderRadius: 3,
-                            background: DIM_COLORS[key] || "#10b981",
-                          }}
-                        />
-                      </Box>
-                      <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#666", minWidth: 28, textAlign: "right" }}>
-                        {Math.round(val)}
-                      </Typography>
-                    </Box>
-                  ))}
-
-                  <Typography sx={{ fontSize: 10, color: "#bbb", mt: 0.5 }}>
-                    基线 · 平均互动 {preScoreData.baseline.avg_engagement.toLocaleString()} · 爆款线 {preScoreData.baseline.viral_threshold.toLocaleString()} · {preScoreData.baseline.sample_size} 条数据
-                  </Typography>
-                </Box>
+                <Typography sx={{ fontSize: 12, color: "#bbb" }}>· 快速评估</Typography>
               </Box>
+
+              {/* Dimension bars inline */}
+              <Box sx={{
+                width: "100%", bgcolor: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)",
+                borderRadius: "16px", border: "1px solid rgba(0,0,0,0.06)", p: 2,
+                boxShadow: "0 2px 12px rgba(0,0,0,0.03)",
+              }}>
+                {Object.entries(preScoreData.dimensions).map(([key, val]) => (
+                  <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75, "&:last-child": { mb: 0 } }}>
+                    <Typography sx={{ fontSize: 12, color: "#888", minWidth: 52, textAlign: "right", fontWeight: 500 }}>
+                      {DIM_LABELS[key] || key}
+                    </Typography>
+                    <Box sx={{ flex: 1, height: 7, bgcolor: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}>
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${val}%` }}
+                        transition={{ duration: 1.2, ease: [0.2, 0, 0.2, 1], delay: 0.2 }}
+                        style={{ height: "100%", borderRadius: 4, background: DIM_COLORS[key] || "#10b981" }}
+                      />
+                    </Box>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#555", minWidth: 28, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {Math.round(val)}
+                    </Typography>
+                  </Box>
+                ))}
+                <Typography sx={{ fontSize: 10, color: "#bbb", mt: 1.25, textAlign: "center" }}>
+                  基于 {preScoreData.baseline.sample_size} 条真实数据 · 平均互动 {preScoreData.baseline.avg_engagement.toLocaleString()} · 爆款线 {preScoreData.baseline.viral_threshold.toLocaleString()}
+                </Typography>
+              </Box>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="placeholder"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.4 }}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}
+            >
+              <motion.div
+                animate={{ scale: [1, 1.06, 1], opacity: [0.35, 0.65, 0.35] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Box sx={{
+                  width: 130, height: 130, borderRadius: "50%",
+                  border: "4px solid rgba(255,36,66,0.12)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "radial-gradient(circle, rgba(255,36,66,0.04) 0%, transparent 70%)",
+                }}>
+                  <Typography sx={{ fontSize: 15, color: "#ccc", fontWeight: 700 }}>
+                    评分中
+                  </Typography>
+                </Box>
+              </motion.div>
+              <Typography sx={{ fontSize: 12, color: "#bbb" }}>
+                正在基于 874 条数据进行快速评估...
+              </Typography>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* ── Left: Note preview ── */}
-        <Box sx={{ bgcolor: "#fff", border: "1px solid #f0f0f0", borderRadius: "16px", p: { xs: 2, md: 2.5 }, alignSelf: "start" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              正在诊断
+        {/* ── Current step heading ── */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            style={{ textAlign: "center", width: "100%" }}
+          >
+            <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#262626", mb: 0.25 }}>
+              {currentStep.label}
             </Typography>
-            {params.coverFile?.type?.startsWith("video/") && (
-              <Box sx={{ px: 0.75, py: 0.125, borderRadius: "4px", bgcolor: "#fff0f1" }}>
-                <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#ff2442" }}>视频笔记</Typography>
-              </Box>
-            )}
-          </Box>
-          <Typography sx={{ fontSize: { xs: 16, md: 18 }, fontWeight: 700, color: "#262626", lineHeight: 1.5, mb: 1.5 }}>
-            {params.title || "截图识别中..."}
-          </Typography>
-
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
-            <Box sx={{ px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#fff0f1", border: "1px solid #ffe0e3" }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#ff2442" }}>
-                {CATEGORY_LABEL[params.category] || params.category}
-              </Typography>
-            </Box>
-            {tagList.length > 0 && (
-              <Typography sx={{ fontSize: 12, color: "#999", lineHeight: "24px" }}>
-                {tagList.length} 个标签
-              </Typography>
-            )}
-          </Box>
-
-          {params.content && (
-            <Typography
-              sx={{
-                fontSize: 13, color: "#666", lineHeight: 1.7,
-                display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical",
-                overflow: "hidden", borderTop: "1px solid #f5f5f5", pt: 1.5,
-              }}
-            >
-              {params.content}
+            <Typography sx={{ fontSize: 12, color: "#999" }}>
+              {currentStep.desc}
             </Typography>
-          )}
+          </motion.div>
+        </AnimatePresence>
 
-          <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid #f5f5f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Typography sx={{ fontSize: 12, color: "#ccc" }}>已用时 {elapsed}s</Typography>
-            <Typography sx={{ fontSize: 12, color: "#ccc" }}>
-              {streamMsg || "预计 30-60s"}
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* ── Right: Progress timeline ── */}
-        <Box sx={{ bgcolor: "#fff", border: "1px solid #f0f0f0", borderRadius: "16px", p: { xs: 2, md: 2.5 }, alignSelf: "start" }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#999", mb: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            诊断进度
-          </Typography>
-
-          <Box sx={{ mb: 2 }}>
-            {STEPS.map((s, i) => {
-              const done = i < step;
-              const active = i === step;
-              return (
-                <Box key={i} sx={{ display: "flex", gap: 1.25, mb: i < STEPS.length - 1 ? 0.75 : 0, alignItems: "flex-start" }}>
-                  <Box sx={{ width: 20, height: 20, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", mt: 0.125 }}>
-                    {done ? (
-                      <CheckCircleOutlinedIcon sx={{ fontSize: 16, color: i === 0 ? "#10b981" : "#16a34a" }} />
-                    ) : active ? (
-                      <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.5, repeat: Infinity }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: i === 0 ? "#10b981" : "#ff2442" }} />
+        {/* ── Agent status strip ── */}
+        <Box sx={{ width: "100%", display: "flex", gap: { xs: 0.75, md: 1 }, justifyContent: "center", flexWrap: "wrap" }}>
+          {AGENTS.map((agent, i) => {
+            const isDone = step >= agent.doneStep;
+            const isActive = !isDone && step >= agent.activeStep;
+            return (
+              <motion.div
+                key={agent.name}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: i * 0.08, ease: "easeOut" }}
+                style={{ flex: "1 1 0", minWidth: 68, maxWidth: 116 }}
+              >
+                <Box sx={{
+                  py: 1.25, px: 0.75,
+                  borderRadius: "14px", border: "1.5px solid",
+                  borderColor: isDone ? "#bbf7d0" : isActive ? "#fecaca" : "rgba(0,0,0,0.06)",
+                  bgcolor: isDone ? "rgba(240,253,244,0.9)" : isActive ? "rgba(255,245,246,0.9)" : "rgba(255,255,255,0.85)",
+                  textAlign: "center", transition: "all 0.4s ease",
+                  boxShadow: isDone
+                    ? "0 0 16px rgba(16,185,129,0.12)"
+                    : isActive
+                      ? "0 0 16px rgba(255,36,66,0.12)"
+                      : "0 1px 4px rgba(0,0,0,0.03)",
+                  backdropFilter: "blur(8px)",
+                }}>
+                  <Box sx={{ mb: 0.5, height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {isDone ? (
+                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 15 }}>
+                        <CheckCircleOutlinedIcon sx={{ fontSize: 16, color: "#16a34a" }} />
+                      </motion.div>
+                    ) : isActive ? (
+                      <motion.div
+                        animate={{ scale: [1, 1.4, 1], opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                        style={{ display: "inline-flex" }}
+                      >
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#ff2442",
+                          boxShadow: "0 0 8px rgba(255,36,66,0.4)" }} />
                       </motion.div>
                     ) : (
-                      <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#e0e0e0" }} />
+                      <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#ddd" }} />
                     )}
                   </Box>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 400,
-                      color: done ? (i === 0 ? "#10b981" : "#16a34a") : active ? "#262626" : "#ccc",
-                      lineHeight: 1.4, transition: "color 0.3s",
-                    }}>
-                      {s.label}
-                      {i === 0 && done && preScoreData ? ` · ${Math.round(preScoreData.total_score)}分` : ""}
-                    </Typography>
-                    {active && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} transition={{ duration: 0.3 }}>
-                        <Typography sx={{ fontSize: 11, color: "#999", mt: 0.125 }}>
-                          {s.desc}
-                        </Typography>
-                      </motion.div>
-                    )}
-                  </Box>
+                  <Typography sx={{
+                    fontSize: 11, fontWeight: isDone || isActive ? 600 : 400,
+                    color: isDone ? "#16a34a" : isActive ? "#ff2442" : "#bbb",
+                    lineHeight: 1.3, letterSpacing: "0.01em",
+                  }}>
+                    {agent.label}
+                  </Typography>
                 </Box>
-              );
-            })}
-          </Box>
-
-          <Box sx={{ height: 4, bgcolor: "#f0f0f0", borderRadius: 2, overflow: "hidden", mb: 1 }}>
-            <Box sx={{
-              height: "100%", borderRadius: 2,
-              background: "linear-gradient(90deg, #10b981, #ff2442)",
-              width: `${progress}%`,
-              transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)",
-            }} />
-          </Box>
-          <Typography sx={{ fontSize: 12, color: "#bbb", textAlign: "right" }}>
-            {Math.round(progress)}%
-          </Typography>
+              </motion.div>
+            );
+          })}
         </Box>
 
-        {/* ── Bottom: Tips ── */}
-        <Box
-          sx={{
-            gridColumn: { xs: "1", md: "1 / -1" },
-            bgcolor: "#fff", border: "1px solid #f0f0f0", borderRadius: "12px",
-            px: { xs: 2, md: 2.5 }, py: 1.5,
-            display: "flex", alignItems: "center", gap: 1.5, minHeight: 44,
-          }}
-        >
-          <Box sx={{ width: 20, height: 20, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        {/* ── Progress bar with shimmer ── */}
+        <Box sx={{ width: "100%" }}>
+          <Box sx={{
+            height: 8, bgcolor: "rgba(0,0,0,0.04)", borderRadius: 4, overflow: "hidden",
+            position: "relative",
+          }}>
+            <Box sx={{
+              height: "100%", borderRadius: 4,
+              background: "linear-gradient(90deg, #10b981 0%, #3b82f6 40%, #ff2442 100%)",
+              width: `${progress}%`,
+              transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)",
+              position: "relative",
+              "&::after": {
+                content: '""', position: "absolute", inset: 0,
+                background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
+                animation: "shimmer 2s infinite",
+              },
+            }} />
+          </Box>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 0.75 }}>
+            <Typography sx={{ fontSize: 12, color: "#999", fontWeight: 500 }}>
+              {Math.round(progress)}% · {step + 1}/{STEPS.length}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* ── Tips card ── */}
+        <Box sx={{
+          width: "100%", bgcolor: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)",
+          border: "1px solid rgba(0,0,0,0.06)", borderRadius: "14px",
+          px: 2, py: 1.5, display: "flex", alignItems: "flex-start", gap: 1.5,
+          boxShadow: "0 1px 4px rgba(0,0,0,0.03)",
+        }}>
+          <Box sx={{
+            width: 24, height: 24, borderRadius: "8px", bgcolor: "rgba(16,185,129,0.1)",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, mt: 0.125,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="8" r="7" stroke="#10b981" strokeWidth="1.5" fill="none" />
-              <text x="8" y="11.5" textAnchor="middle" fill="#10b981" fontSize="10" fontWeight="700" fontFamily="Inter, sans-serif">i</text>
+              <text x="8" y="11.5" textAnchor="middle" fill="#10b981" fontSize="10" fontWeight="700" fontFamily="Inter,sans-serif">i</text>
             </svg>
           </Box>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={tipIdx}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.3 }}
-              style={{ flex: 1 }}
-            >
-              <Typography sx={{ fontSize: 13, color: "#666", lineHeight: 1.5 }}>
-                📊 {tips[tipIdx]}
-              </Typography>
-            </motion.div>
-          </AnimatePresence>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: 10, fontWeight: 600, color: "#10b981", mb: 0.25, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              数据洞察
+            </Typography>
+            <AnimatePresence mode="wait">
+              <motion.div key={tipIdx} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.3 }}>
+                <Typography sx={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>
+                  {tips[tipIdx]}
+                </Typography>
+              </motion.div>
+            </AnimatePresence>
+          </Box>
         </Box>
 
         {/* ── Fun fact quiz ── */}
-        <Box
-          sx={{
-            gridColumn: { xs: "1", md: "1 / -1" },
-            bgcolor: "#fff", border: "1px solid #f0f0f0", borderRadius: "12px",
-            px: { xs: 2, md: 2.5 }, py: 2, cursor: "pointer",
-            transition: "border-color 0.2s",
-            "&:hover": { borderColor: "#ff2442" },
-          }}
-          onClick={() => setShowAnswer(true)}
+        <motion.div
+          style={{ width: "100%" }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
         >
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#ff2442", mb: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            {showAnswer ? "答案" : "猜一猜"}
-          </Typography>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`${factIdx}-${showAnswer}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.25 }}
-            >
-              <Typography sx={{ fontSize: 14, fontWeight: showAnswer ? 700 : 500, color: showAnswer ? "#ff2442" : "#262626", lineHeight: 1.6 }}>
-                {showAnswer ? FUN_FACTS[factIdx].a : FUN_FACTS[factIdx].q}
-              </Typography>
-            </motion.div>
-          </AnimatePresence>
-          {!showAnswer && (
-            <Typography sx={{ fontSize: 11, color: "#ccc", mt: 0.5 }}>
-              点击揭晓答案
+          <Box
+            sx={{
+              bgcolor: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)",
+              border: showAnswer ? "1.5px solid rgba(255,36,66,0.2)" : "1px solid rgba(0,0,0,0.06)",
+              borderRadius: "14px", px: 2, py: 2, cursor: "pointer",
+              transition: "all 0.3s ease",
+              boxShadow: showAnswer ? "0 0 20px rgba(255,36,66,0.06)" : "0 1px 4px rgba(0,0,0,0.03)",
+            }}
+            onClick={() => setShowAnswer(true)}
+          >
+            <Typography sx={{
+              fontSize: 10, fontWeight: 700,
+              color: showAnswer ? "#ff2442" : "#bbb",
+              mb: 0.75, textTransform: "uppercase", letterSpacing: "0.08em",
+            }}>
+              {showAnswer ? "答案揭晓" : "猜一猜"}
             </Typography>
-          )}
-        </Box>
+            <AnimatePresence mode="wait">
+              <motion.div key={`${factIdx}-${showAnswer}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.3 }}>
+                <Typography sx={{
+                  fontSize: 15, fontWeight: showAnswer ? 700 : 500,
+                  color: showAnswer ? "#ff2442" : "#262626", lineHeight: 1.65,
+                }}>
+                  {showAnswer ? FUN_FACTS[factIdx].a : FUN_FACTS[factIdx].q}
+                </Typography>
+              </motion.div>
+            </AnimatePresence>
+            {!showAnswer && (
+              <Typography sx={{ fontSize: 11, color: "#ccc", mt: 0.75, fontWeight: 500 }}>
+                点击揭晓答案
+              </Typography>
+            )}
+          </Box>
+        </motion.div>
       </Box>
+
     </Box>
   );
 }

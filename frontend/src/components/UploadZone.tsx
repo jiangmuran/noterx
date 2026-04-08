@@ -265,25 +265,47 @@ export default function UploadZone({
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                padding: compact ? 16 : 28,
-                gap: compact ? 4 : 6,
+                padding: compact ? "24px 16px" : "40px 24px",
+                gap: compact ? 6 : 10,
                 cursor: "pointer",
               }}
               onClick={() => inputRef.current?.click()}
             >
-              <CloudUploadIcon
-                sx={{
-                  fontSize: compact ? 32 : 38,
-                  color: "primary.light",
-                  filter: "drop-shadow(0 2px 6px rgba(255,36,66,0.2))",
-                }}
-              />
-              <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: compact ? "0.8rem" : "0.85rem", mt: 0.5, textAlign: "center", letterSpacing: "0.01em" }}>
-                拖拽、点击或 Ctrl+V 上传（支持多选）
-              </Typography>
-              <Typography sx={{ color: "text.secondary", opacity: 0.85, fontSize: compact ? "0.7rem" : "0.75rem", textAlign: "center", lineHeight: 1.55 }}>
-                图片（JPG/PNG/WebP，最多 {maxFiles} 张）或视频（MP4/MOV，1 个）
-              </Typography>
+              <Box sx={{
+                width: compact ? 52 : 64,
+                height: compact ? 52 : 64,
+                borderRadius: compact ? "14px" : "18px",
+                background: "linear-gradient(135deg, rgba(255,36,66,0.08) 0%, rgba(255,100,120,0.04) 100%)",
+                border: "1.5px solid rgba(255,36,66,0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                <CloudUploadIcon sx={{ fontSize: compact ? 26 : 32, color: "#ff2442" }} />
+              </Box>
+              <Box sx={{ textAlign: "center" }}>
+                <Typography sx={{
+                  color: "#1a1a1a", fontWeight: 700,
+                  fontSize: compact ? 14 : 16,
+                  lineHeight: 1.3, mb: 0.5,
+                }}>
+                  拖入截图开始诊断
+                </Typography>
+                <Typography sx={{
+                  color: "#999",
+                  fontSize: compact ? 12 : 13,
+                  lineHeight: 1.5,
+                }}>
+                  支持拖拽 · 点击 · Ctrl+V 粘贴
+                </Typography>
+                <Typography sx={{
+                  color: "#bbb",
+                  fontSize: compact ? 11 : 12,
+                  mt: 0.25,
+                }}>
+                  图片最多 {maxFiles} 张 · 视频 1 个
+                </Typography>
+              </Box>
             </motion.div>
           )}
         </AnimatePresence>
