@@ -20,7 +20,11 @@ body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:var(
 .hero h1 .red{color:var(--red)}
 .hero .sub{color:var(--slate);font-size:clamp(0.9rem,2.5vw,1.1rem);margin-top:1.2rem;font-weight:400;line-height:1.8}
 .hero .sub strong{color:var(--ink);font-weight:600}
-.hero .cta{margin-top:2.5rem}
+.hero .nums{display:flex;justify-content:center;gap:clamp(1rem,4vw,2.5rem);flex-wrap:wrap}
+.hero .num-item{text-align:center}
+.hero .num-item .n{font-size:clamp(1.4rem,4vw,2rem);font-weight:900;color:var(--red);font-variant-numeric:tabular-nums}
+.hero .num-item .l{font-size:0.7rem;color:var(--muted);margin-top:0.1rem}
+.hero .cta{margin-top:2.5rem;display:flex;gap:0.8rem;justify-content:center;flex-wrap:wrap}
 .btn{display:inline-flex;align-items:center;gap:0.4rem;padding:0.75rem 2rem;border-radius:10px;font-size:0.95rem;font-weight:700;text-decoration:none;border:none;cursor:pointer;transition:all 0.2s}
 .btn-red{background:var(--red);color:#fff;box-shadow:0 4px 20px rgba(255,36,66,0.3)}
 .btn-red:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,36,66,0.4)}
@@ -103,8 +107,13 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
 .float-cta .btn-red{font-size:0.85rem;padding:0.6rem 1.4rem;box-shadow:0 6px 24px rgba(255,36,66,0.35)}
 
 /* ━━ Launch overlay ━━ */
-#launch-overlay{position:fixed;inset:0;z-index:99999;pointer-events:none;background:var(--red);opacity:0;transition:opacity 0.35s ease;display:flex;align-items:center;justify-content:center}
+#launch-overlay{position:fixed;inset:0;z-index:99999;pointer-events:none;background:#fff;opacity:0;transition:opacity 0.3s ease;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.8rem}
 #launch-overlay.go{opacity:1;pointer-events:all}
+#launch-overlay .lo-name{font-size:1.5rem;font-weight:900;color:var(--red);opacity:0;transform:translateY(8px);transition:opacity 0.3s 0.15s,transform 0.3s 0.15s}
+#launch-overlay.go .lo-name{opacity:1;transform:none}
+#launch-overlay .lo-spin{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:sp 0.7s linear infinite;opacity:0;transition:opacity 0.2s 0.25s}
+#launch-overlay.go .lo-spin{opacity:1}
+@keyframes sp{to{transform:rotate(360deg)}}
 
 /* ━━ Scroll reveal ━━ */
 .rv{opacity:0;transform:translateY(24px);transition:opacity 0.6s,transform 0.6s}.rv.vis{opacity:1;transform:none}
@@ -141,8 +150,15 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
       上传笔记，5 个 AI 专家帮你诊断<br>
       基于 <strong>874 条真实数据</strong> 给出量化评分和优化方案
     </p>
+    <div class="nums" style="margin-top:2rem">
+      <div class="num-item"><div class="n" data-c="874">0</div><div class="l">真实笔记</div></div>
+      <div class="num-item"><div class="n" data-c="2500">0</div><div class="l">条评论</div></div>
+      <div class="num-item"><div class="n" data-c="5">0</div><div class="l">个品类</div></div>
+      <div class="num-item"><div class="n" data-c="5">0</div><div class="l">位 AI Agent</div></div>
+    </div>
     <div class="cta">
-      <a href="/app" onclick="return go(event)" class="btn btn-red">开始诊断</a>
+      <a href="/app" onclick="return go(event)" class="btn btn-red">开始诊断笔记</a>
+      <a href="#about" class="btn btn-ghost">看看我们发现了什么 ↓</a>
     </div>
   </div>
   <div class="scroll">↓ 向下探索</div>
@@ -447,14 +463,17 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
 </footer>
 
 <!-- ━━ OVERLAY ━━ -->
-<div id="launch-overlay"></div>
+<div id="launch-overlay">
+  <div class="lo-name">薯医 NoteRx</div>
+  <div class="lo-spin"></div>
+</div>
 
 <script>
 // Launch transition
 function go(e){
   e.preventDefault();
   document.getElementById('launch-overlay').classList.add('go');
-  setTimeout(function(){window.location.href='/app'},400);
+  setTimeout(function(){window.location.href='/app'},800);
   return false;
 }
 
