@@ -279,7 +279,7 @@ const themeOptions: ThemeOptions = {
           borderRadius: 12,
           alignItems: "center",
         },
-        standardWarning: {
+        colorWarning: {
           backgroundColor: "rgba(245, 158, 11, 0.08)",
           color: "#92400e",
           border: "1px solid rgba(245, 158, 11, 0.2)",
