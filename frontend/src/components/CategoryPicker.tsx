@@ -12,6 +12,7 @@ const CATEGORIES = [
   { key: "travel", label: "旅行" },
   { key: "beauty", label: "美妆" },
   { key: "fitness", label: "健身" },
+  { key: "lifestyle", label: "生活" },
 ];
 
 export default function CategoryPicker({ value, onChange }: Props) {

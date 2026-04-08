@@ -34,6 +34,8 @@ interface HistoryItem {
   grade: string;
   category: string;
   date: number;
+  report?: unknown;
+  params?: Record<string, unknown>;
 }
 
 const GRADE_COLOR: Record<string, string> = {
@@ -41,7 +43,7 @@ const GRADE_COLOR: Record<string, string> = {
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
-  food: "美食", fashion: "穿搭", tech: "科技", travel: "旅行", beauty: "美妆", fitness: "健身",
+  food: "美食", fashion: "穿搭", tech: "科技", travel: "旅行", beauty: "美妆", fitness: "健身", lifestyle: "生活",
 };
 
 export default function Home() {
@@ -258,9 +260,17 @@ export default function Home() {
             {history.slice(0, 5).map((h, i) => (
               <Box
                 key={i}
+                onClick={() => {
+                  if (h.report) {
+                    navigate("/report", { state: { report: h.report, params: h.params || { title: h.title, category: h.category }, isFallback: false } });
+                  }
+                }}
                 sx={{
                   px: 2, py: 1.25, display: "flex", alignItems: "center", gap: 1.5,
                   borderBottom: i < Math.min(history.length, 5) - 1 ? "1px solid #f5f5f5" : "none",
+                  cursor: h.report ? "pointer" : "default",
+                  "&:hover": h.report ? { bgcolor: "#fafafa" } : {},
+                  transition: "background 0.15s",
                 }}
               >
                 <Typography sx={{ fontSize: 18, fontWeight: 700, color: GRADE_COLOR[h.grade] || "#999", width: 28, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
@@ -274,8 +284,13 @@ export default function Home() {
                     {CATEGORY_LABEL[h.category] || h.category} · {new Date(h.date).toLocaleDateString()}
                   </Typography>
                 </Box>
-                <Box sx={{ px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#f5f5f5" }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: GRADE_COLOR[h.grade] || "#999" }}>{h.grade}</Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#f5f5f5" }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: GRADE_COLOR[h.grade] || "#999" }}>{h.grade}</Typography>
+                  </Box>
+                  {h.report && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                  )}
                 </Box>
               </Box>
             ))}
