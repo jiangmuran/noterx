@@ -63,7 +63,8 @@ export default function Diagnosing() {
   const location = useLocation();
   const navigate = useNavigate();
   const params = location.state as {
-    title: string; content: string; tags: string; category: string; coverFile: File | null; videoFile?: File | null;
+    title: string; content: string; tags: string; category: string;
+    coverFile: File | null; coverImages?: File[]; videoFile?: File | null;
   } | null;
 
   const [step, setStep] = useState(0);
@@ -85,6 +86,7 @@ export default function Diagnosing() {
           title: params.title, content: params.content,
           category: params.category, tags: params.tags,
           coverImage: params.coverFile ?? undefined,
+          coverImages: params.coverImages,
           videoFile: params.videoFile ?? undefined,
         });
         resultRef.current = { report: result, isFallback: false };

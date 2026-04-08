@@ -2,12 +2,17 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Typography, IconButton } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CloseIcon from "@mui/icons-material/Close";
+import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface UploadZoneProps {
-  file?: File | null;
-  onFileSelect: (file: File | null) => void;
+  /** Controlled file list from parent */
+  files?: File[];
+  /** Called whenever the file list changes */
+  onFilesChange: (files: File[]) => void;
+  /** Max number of files allowed */
+  maxFiles?: number;
 }
 
 function formatSize(size: number): string {
@@ -22,72 +27,96 @@ const ALL_ACCEPT = [...IMAGE_TYPES, ...VIDEO_TYPES].join(",");
 const MAX_IMAGE = 10 * 1024 * 1024;
 const MAX_VIDEO = 200 * 1024 * 1024;
 
-export default function UploadZone({ file = null, onFileSelect }: UploadZoneProps) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const [fileInfo, setFileInfo] = useState<{ name: string; size: number; isVideo: boolean } | null>(null);
+/**
+ * Multi-file upload zone with grid preview.
+ * Supports images and one video. Shows thumbnails in a responsive grid.
+ */
+export default function UploadZone({
+  files = [],
+  onFilesChange,
+  maxFiles = 9,
+}: UploadZoneProps) {
+  const [previews, setPreviews] = useState<Record<string, string>>({});
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback((f: File) => {
-    setError("");
-    const isVideo = VIDEO_TYPES.includes(f.type);
-    const isImage = IMAGE_TYPES.includes(f.type);
-
-    if (!isImage && !isVideo) {
-      setError("支持图片（JPG/PNG/WebP）或视频（MP4/MOV/WebM）");
-      return;
-    }
-    if (isImage && f.size > MAX_IMAGE) {
-      setError(`图片过大（${formatSize(f.size)}），请控制在 10MB 以内`);
-      return;
-    }
-    if (isVideo && f.size > MAX_VIDEO) {
-      setError(`视频过大（${formatSize(f.size)}），请控制在 200MB 以内`);
-      return;
-    }
-
-    onFileSelect(f);
-    setFileInfo({ name: f.name, size: f.size, isVideo });
-
-    if (isImage) {
-      const reader = new FileReader();
-      reader.onload = (e) => setPreview(e.target?.result as string);
-      reader.readAsDataURL(f);
-    } else {
-      setPreview(null); // video has no inline preview
-    }
-  }, [onFileSelect]);
-
-  const handleRemove = useCallback(() => {
-    setPreview(null);
-    setFileInfo(null);
-    setError("");
-    onFileSelect(null);
-    if (inputRef.current) inputRef.current.value = "";
-  }, [onFileSelect]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
-  }, [handleFile]);
-
+  /** Generate preview URLs for new files */
   useEffect(() => {
-    if (!file) { setPreview(null); setFileInfo(null); return; }
-    const isVideo = VIDEO_TYPES.includes(file.type);
-    setFileInfo({ name: file.name, size: file.size, isVideo });
-    if (!isVideo) {
-      const reader = new FileReader();
-      reader.onload = (e) => setPreview(e.target?.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      setPreview(null);
-    }
-  }, [file]);
+    const newPreviews: Record<string, string> = {};
+    const toRevoke: string[] = [];
 
-  const hasFile = fileInfo !== null;
+    files.forEach((f) => {
+      const key = `${f.name}_${f.size}_${f.lastModified}`;
+      if (previews[key]) {
+        newPreviews[key] = previews[key];
+      } else if (IMAGE_TYPES.includes(f.type)) {
+        const url = URL.createObjectURL(f);
+        newPreviews[key] = url;
+      }
+    });
+
+    Object.entries(previews).forEach(([k, url]) => {
+      if (!newPreviews[k]) toRevoke.push(url);
+    });
+    toRevoke.forEach((u) => URL.revokeObjectURL(u));
+
+    setPreviews(newPreviews);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
+
+  const fileKey = (f: File) => `${f.name}_${f.size}_${f.lastModified}`;
+
+  const validateAndAdd = useCallback(
+    (incoming: File[]) => {
+      setError("");
+      const valid: File[] = [];
+      for (const f of incoming) {
+        const isVideo = VIDEO_TYPES.includes(f.type);
+        const isImage = IMAGE_TYPES.includes(f.type);
+        if (!isImage && !isVideo) {
+          setError("仅支持图片（JPG/PNG/WebP）或视频（MP4/MOV/WebM）");
+          continue;
+        }
+        if (isImage && f.size > MAX_IMAGE) {
+          setError(`图片过大（${formatSize(f.size)}），最大 10MB`);
+          continue;
+        }
+        if (isVideo && f.size > MAX_VIDEO) {
+          setError(`视频过大（${formatSize(f.size)}），最大 200MB`);
+          continue;
+        }
+        if (isVideo && files.some((ex) => VIDEO_TYPES.includes(ex.type))) {
+          setError("仅支持上传一个视频");
+          continue;
+        }
+        valid.push(f);
+      }
+      if (valid.length === 0) return;
+      const merged = [...files, ...valid].slice(0, maxFiles);
+      onFilesChange(merged);
+    },
+    [files, maxFiles, onFilesChange],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      validateAndAdd(Array.from(e.dataTransfer.files));
+    },
+    [validateAndAdd],
+  );
+
+  const removeFile = useCallback(
+    (idx: number) => {
+      const next = files.filter((_, i) => i !== idx);
+      onFilesChange(next);
+    },
+    [files, onFilesChange],
+  );
+
+  const hasFiles = files.length > 0;
 
   return (
     <>
@@ -95,70 +124,111 @@ export default function UploadZone({ file = null, onFileSelect }: UploadZoneProp
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        onClick={() => !hasFile && inputRef.current?.click()}
         sx={{
           borderRadius: "12px",
           border: `2px dashed ${isDragging ? "#ff2442" : error ? "#ef4444" : "#e0e0e0"}`,
           bgcolor: isDragging ? "rgba(255,36,66,0.03)" : "#fff",
-          cursor: hasFile ? "default" : "pointer",
           transition: "all 0.2s",
           overflow: "hidden",
-          minHeight: 160,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          "&:hover": hasFile ? {} : { borderColor: "#ff2442", bgcolor: "#fafafa" },
         }}
       >
         <input
           ref={inputRef}
           type="file"
           accept={ALL_ACCEPT}
+          multiple
           hidden
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+          onChange={(e) => {
+            if (e.target.files) validateAndAdd(Array.from(e.target.files));
+            e.target.value = "";
+          }}
         />
 
         <AnimatePresence mode="wait">
-          {hasFile ? (
+          {hasFiles ? (
             <motion.div
-              key="preview"
+              key="grid"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              style={{ width: "100%", padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}
             >
-              <Box sx={{ position: "relative", display: "inline-block" }}>
-                {preview ? (
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 1,
+                  p: 1.5,
+                }}
+              >
+                {files.map((f, idx) => {
+                  const key = fileKey(f);
+                  const isVideo = VIDEO_TYPES.includes(f.type);
+                  return (
+                    <Box
+                      key={key}
+                      sx={{
+                        position: "relative",
+                        aspectRatio: "1",
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        bgcolor: "#f5f5f5",
+                      }}
+                    >
+                      {isVideo ? (
+                        <Box sx={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <VideocamOutlinedIcon sx={{ fontSize: 28, color: "#999" }} />
+                        </Box>
+                      ) : previews[key] ? (
+                        <Box
+                          component="img"
+                          src={previews[key]}
+                          alt={f.name}
+                          sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        />
+                      ) : (
+                        <Box sx={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <Typography sx={{ fontSize: 11, color: "#999" }}>加载中</Typography>
+                        </Box>
+                      )}
+                      <IconButton
+                        size="small"
+                        onClick={() => removeFile(idx)}
+                        sx={{
+                          position: "absolute", top: 2, right: 2,
+                          bgcolor: "rgba(0,0,0,0.45)", color: "#fff",
+                          width: 20, height: 20,
+                          "&:hover": { bgcolor: "rgba(0,0,0,0.65)" },
+                        }}
+                      >
+                        <CloseIcon sx={{ fontSize: 12 }} />
+                      </IconButton>
+                    </Box>
+                  );
+                })}
+                {files.length < maxFiles && (
                   <Box
-                    component="img"
-                    src={preview}
-                    alt="preview"
-                    sx={{ maxHeight: 180, maxWidth: "100%", borderRadius: "10px", display: "block" }}
-                  />
-                ) : (
-                  <Box sx={{ width: 120, height: 80, borderRadius: "10px", bgcolor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <VideocamOutlinedIcon sx={{ fontSize: 32, color: "#bbb" }} />
+                    onClick={() => inputRef.current?.click()}
+                    sx={{
+                      aspectRatio: "1",
+                      borderRadius: "8px",
+                      border: "1px dashed #ddd",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      "&:hover": { borderColor: "#ff2442", bgcolor: "#fff5f6" },
+                    }}
+                  >
+                    <AddPhotoAlternateIcon sx={{ fontSize: 24, color: "#ccc" }} />
+                    <Typography sx={{ fontSize: 11, color: "#999", mt: 0.25 }}>
+                      {files.length}/{maxFiles}
+                    </Typography>
                   </Box>
                 )}
-                <IconButton
-                  size="small"
-                  onClick={(e) => { e.stopPropagation(); handleRemove(); }}
-                  sx={{
-                    position: "absolute", top: -8, right: -8,
-                    bgcolor: "#ff2442", color: "#fff", width: 24, height: 24,
-                    "&:hover": { bgcolor: "#d91a36" },
-                  }}
-                >
-                  <CloseIcon sx={{ fontSize: 14 }} />
-                </IconButton>
               </Box>
-              <Typography sx={{ fontSize: 13, color: "#262626", fontWeight: 500 }}>
-                {fileInfo!.name}
-                <Typography component="span" sx={{ color: "#999", ml: 1, fontSize: 12 }}>
-                  {formatSize(fileInfo!.size)}
-                </Typography>
-              </Typography>
             </motion.div>
           ) : (
             <motion.div
@@ -167,14 +237,15 @@ export default function UploadZone({ file = null, onFileSelect }: UploadZoneProp
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: 28, gap: 6 }}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: 28, gap: 6, cursor: "pointer" }}
+              onClick={() => inputRef.current?.click()}
             >
               <CloudUploadIcon sx={{ fontSize: 36, color: "#ccc" }} />
               <Typography sx={{ color: "#666", fontWeight: 500, fontSize: "0.85rem", mt: 0.5 }}>
-                拖拽、点击或 Ctrl+V 上传
+                拖拽、点击或 Ctrl+V 上传（支持多选）
               </Typography>
               <Typography sx={{ color: "#bbb", fontSize: "0.75rem" }}>
-                图片（JPG/PNG/WebP，10MB）或视频（MP4/MOV，200MB）
+                图片（JPG/PNG/WebP，最多 {maxFiles} 张）或视频（MP4/MOV，1 个）
               </Typography>
             </motion.div>
           )}
