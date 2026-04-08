@@ -242,9 +242,8 @@ async def quick_recognize(
         )
         slot_type = _normalize_slot_type(result.get("slot_type", ""))
         result["slot_type"] = slot_type
-        if slot_type != "content":
-            result["title"] = ""
-            result["content_text"] = ""
+        # 保留 AI 提取的 title/content_text，即使不是 content 类型
+        # 前端会根据 slot_type 决定如何使用
 
         if slot_hint == "content" or slot_type == "content":
             content_text = str(result.get("content_text", "")).strip()
