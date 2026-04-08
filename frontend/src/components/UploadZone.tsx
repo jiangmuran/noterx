@@ -128,10 +128,14 @@ export default function UploadZone({
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         sx={{
-          borderRadius: "12px",
-          border: `2px dashed ${isDragging ? "#ff2442" : error ? "#ef4444" : "#e0e0e0"}`,
-          bgcolor: isDragging ? "rgba(255,36,66,0.03)" : "#fff",
-          transition: "all 0.2s",
+          borderRadius: "14px",
+          border: `2px dashed ${isDragging ? "rgba(255, 36, 66, 0.65)" : error ? "#ef4444" : "rgba(0,0,0,0.1)"}`,
+          bgcolor: isDragging ? "rgba(255,36,66,0.06)" : "rgba(255,255,255,0.65)",
+          backdropFilter: "blur(6px)",
+          boxShadow: isDragging
+            ? "0 0 0 3px rgba(255,36,66,0.12), inset 0 1px 0 rgba(255,255,255,0.9)"
+            : "inset 0 1px 0 rgba(255,255,255,0.85)",
+          transition: "border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease",
           overflow: "hidden",
         }}
       >
@@ -175,9 +179,12 @@ export default function UploadZone({
                       sx={{
                         position: "relative",
                         aspectRatio: "1",
-                        borderRadius: "8px",
+                        borderRadius: "12px",
                         overflow: "hidden",
-                        bgcolor: "#f5f5f5",
+                        bgcolor: "#f0f0f2",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                        "&:hover": { transform: "scale(1.02)", boxShadow: "0 4px 14px rgba(0,0,0,0.1)" },
                       }}
                     >
                       {isVideo ? (
@@ -222,15 +229,20 @@ export default function UploadZone({
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
                     sx={{
                       aspectRatio: "1",
-                      borderRadius: "8px",
-                      border: "1px dashed #ddd",
+                      borderRadius: "12px",
+                      border: "1px dashed rgba(255,36,66,0.25)",
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: "pointer",
-                      transition: "all 0.15s",
-                      "&:hover": { borderColor: "#ff2442", bgcolor: "#fff5f6" },
+                      bgcolor: "rgba(255,245,247,0.4)",
+                      transition: "all 0.2s ease",
+                      "&:hover": {
+                        borderColor: "primary.main",
+                        bgcolor: "rgba(255,36,66,0.08)",
+                        boxShadow: "0 2px 12px rgba(255,36,66,0.12)",
+                      },
                       "&:focus-visible": { outline: "2px solid #ff2442", outlineOffset: 2 },
                     }}
                   >
@@ -259,11 +271,17 @@ export default function UploadZone({
               }}
               onClick={() => inputRef.current?.click()}
             >
-              <CloudUploadIcon sx={{ fontSize: compact ? 30 : 36, color: "#ccc" }} />
-              <Typography sx={{ color: "#666", fontWeight: 500, fontSize: compact ? "0.8rem" : "0.85rem", mt: 0.5, textAlign: "center" }}>
+              <CloudUploadIcon
+                sx={{
+                  fontSize: compact ? 32 : 38,
+                  color: "primary.light",
+                  filter: "drop-shadow(0 2px 6px rgba(255,36,66,0.2))",
+                }}
+              />
+              <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: compact ? "0.8rem" : "0.85rem", mt: 0.5, textAlign: "center", letterSpacing: "0.01em" }}>
                 拖拽、点击或 Ctrl+V 上传（支持多选）
               </Typography>
-              <Typography sx={{ color: "#bbb", fontSize: compact ? "0.7rem" : "0.75rem", textAlign: "center" }}>
+              <Typography sx={{ color: "text.secondary", opacity: 0.85, fontSize: compact ? "0.7rem" : "0.75rem", textAlign: "center", lineHeight: 1.55 }}>
                 图片（JPG/PNG/WebP，最多 {maxFiles} 张）或视频（MP4/MOV，1 个）
               </Typography>
             </motion.div>
