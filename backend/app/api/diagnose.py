@@ -1,12 +1,19 @@
-﻿"""Note diagnose API routes."""
+"""Note diagnose API routes."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import os
+import re
 import tempfile
+import time
+import uuid
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse
 
 from app.models.schemas import DiagnoseResponse
 
@@ -17,7 +24,26 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200 MB
 MAX_IMAGE_COUNT = 9
 ALLOWED_IMAGE_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-ALLOWED_VIDEO_MIME = {"video/mp4", "video/quicktime", "video/webm", "video/x-matroska"}
+ALLOWED_VIDEO_MIME = {"video/mp4", "video/quicktime", "video/webm", "video/x-matroska", "video/x-msvideo", "video/x-ms-wmv"}
+MIMO_VIDEO_MIME = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/x-ms-wmv"}
+
+MIME_TO_EXT = {
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/x-msvideo": ".avi",
+    "video/x-ms-wmv": ".wmv",
+    "video/webm": ".webm",
+}
+VIDEO_FILE_RE = re.compile(r"^[a-f0-9]{32}_[0-9]{10}\.(mp4|mov|avi|wmv|webm)$")
+TEMP_VIDEO_TTL_SECONDS = int(os.getenv("TEMP_VIDEO_TTL_SECONDS", "900"))
+TEMP_VIDEO_SIGNING_KEY = os.getenv("TEMP_VIDEO_SIGNING_KEY", "dev-change-me")
+TEMP_VIDEO_PUBLIC_BASE_URL = os.getenv("MIMO_VIDEO_PUBLIC_BASE_URL", "").strip().rstrip("/")
+TEMP_VIDEO_DIR = Path(
+    os.getenv(
+        "TEMP_VIDEO_DIR",
+        str(Path(__file__).resolve().parents[2] / "data" / "temp_videos"),
+    )
+)
 
 
 def _extract_first_video_frame(video_bytes: bytes) -> Optional[bytes]:
@@ -75,8 +101,96 @@ async def _read_and_validate_video(file: UploadFile) -> bytes:
     return video_bytes
 
 
+# ─── Temp video URL serving (for MiMo video_url mode) ───
+
+def _ensure_temp_video_dir() -> None:
+    TEMP_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _sign_temp_video(file_name: str, exp: int) -> str:
+    payload = f"{file_name}:{exp}".encode("utf-8")
+    return hmac.new(TEMP_VIDEO_SIGNING_KEY.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+
+
+def _cleanup_expired_temp_videos(now_ts: Optional[int] = None) -> None:
+    _ensure_temp_video_dir()
+    now = now_ts or int(time.time())
+    for item in TEMP_VIDEO_DIR.iterdir():
+        if not item.is_file():
+            continue
+        name = item.name
+        if not VIDEO_FILE_RE.fullmatch(name):
+            continue
+        exp_str = name.split("_", 1)[1].split(".", 1)[0]
+        try:
+            exp = int(exp_str)
+        except ValueError:
+            continue
+        if exp < now - 60:
+            try:
+                item.unlink(missing_ok=True)
+            except Exception:
+                logger.warning("Failed to delete expired temp video: %s", item)
+
+
+def _build_public_base_url(request: Request) -> str:
+    if TEMP_VIDEO_PUBLIC_BASE_URL:
+        return TEMP_VIDEO_PUBLIC_BASE_URL
+    return str(request.base_url).rstrip("/")
+
+
+def _store_temp_video_and_build_url(request: Request, video_bytes: bytes, mime: str) -> str:
+    _cleanup_expired_temp_videos()
+    _ensure_temp_video_dir()
+
+    now = int(time.time())
+    exp = now + max(60, TEMP_VIDEO_TTL_SECONDS)
+    ext = MIME_TO_EXT.get(mime, ".mp4")
+    file_name = f"{uuid.uuid4().hex}_{exp}{ext}"
+    file_path = TEMP_VIDEO_DIR / file_name
+    file_path.write_bytes(video_bytes)
+
+    sig = _sign_temp_video(file_name, exp)
+    base = _build_public_base_url(request)
+    return f"{base}/api/temp-video/{file_name}?exp={exp}&sig={sig}"
+
+
+@router.get("/temp-video/{file_name}")
+async def get_temp_video(
+    file_name: str,
+    exp: int = Query(...),
+    sig: str = Query(...),
+):
+    if not VIDEO_FILE_RE.fullmatch(file_name):
+        raise HTTPException(400, "invalid file name")
+
+    expected_sig = _sign_temp_video(file_name, exp)
+    if not hmac.compare_digest(sig, expected_sig):
+        raise HTTPException(403, "invalid signature")
+
+    if exp < int(time.time()):
+        raise HTTPException(410, "video url expired")
+
+    file_path = TEMP_VIDEO_DIR / file_name
+    if not file_path.exists():
+        raise HTTPException(404, "video not found")
+
+    ext = file_path.suffix.lower()
+    media_type = {
+        ".mp4": "video/mp4",
+        ".mov": "video/quicktime",
+        ".avi": "video/x-msvideo",
+        ".wmv": "video/x-ms-wmv",
+        ".webm": "video/webm",
+    }.get(ext, "application/octet-stream")
+    return FileResponse(path=file_path, media_type=media_type, filename=file_name)
+
+
+# ─── Main diagnose endpoint ───
+
 @router.post("/diagnose", response_model=DiagnoseResponse)
 async def diagnose_note(
+    request: Request,
     title: str = Form(""),
     content: str = Form(""),
     category: str = Form(...),
@@ -88,6 +202,7 @@ async def diagnose_note(
     """Receive note content and run multi-agent diagnosis."""
     from app.agents.orchestrator import Orchestrator
 
+    # Collect image files
     image_files: list[UploadFile] = []
     if cover_image is not None:
         image_files.append(cover_image)
@@ -99,7 +214,7 @@ async def diagnose_note(
 
     parsed_images: list[bytes] = []
     for index, image in enumerate(image_files):
-        parsed_images.append(await _read_and_validate_image(image, f"cover_images[{index}]") )
+        parsed_images.append(await _read_and_validate_image(image, f"cover_images[{index}]"))
 
     video_bytes: Optional[bytes] = None
     if video_file is not None:
@@ -109,13 +224,35 @@ async def diagnose_note(
     if len(parsed_images) > 1:
         logger.info("Received %d images; use first image as cover for current pipeline", len(parsed_images))
 
+    # Video analysis via MiMo omni
+    video_analysis: Optional[dict] = None
+
     if image_bytes is None and video_bytes is not None:
+        # Extract first frame as fallback cover image
         extracted = _extract_first_video_frame(video_bytes)
         if extracted is not None:
             image_bytes = extracted
             logger.info("Using first frame from video for visual analysis")
         else:
-            logger.info("Video uploaded but no frame extracted; continue without visual image")
+            logger.info("Video frame extraction failed, visual baseline may fallback")
+
+        # Try MiMo video understanding via signed temp URL
+        mime_for_video = (video_file.content_type if video_file else None) or "video/mp4"
+        if mime_for_video in MIMO_VIDEO_MIME:
+            logger.info("Trying MiMo video understanding via signed temp URL (%s)", mime_for_video)
+            try:
+                from app.analysis.video_analyzer import VideoAnalyzer
+
+                video_url = _store_temp_video_and_build_url(request, video_bytes, mime_for_video)
+                analyzer = VideoAnalyzer()
+                video_analysis = await analyzer.analyze(
+                    video_url,
+                    prompt_hint=f"title={title[:80]} | category={category}",
+                )
+            except Exception as e:
+                logger.warning("Video understanding failed, fallback to title/content inference: %s", e)
+        else:
+            logger.info("Video mime %s outside MiMo supported types; skip video understanding", mime_for_video)
 
     tag_list = [token.strip() for token in tags.split(",") if token.strip()] if tags else []
 
@@ -144,6 +281,7 @@ async def diagnose_note(
         category=category,
         tags=tag_list,
         cover_image=image_bytes,
+        video_analysis=video_analysis,
     )
     return report
 

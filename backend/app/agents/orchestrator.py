@@ -96,6 +96,7 @@ class Orchestrator:
         category: str,
         tags: list[str],
         cover_image: Optional[bytes] = None,
+        video_analysis: Optional[dict] = None,
     ) -> dict:
         t0 = time.time()
 
@@ -121,6 +122,10 @@ class Orchestrator:
                 "text_ratio": image_analysis.get("text_ratio", 0),
                 "has_face": image_analysis.get("has_face", False),
             })
+        elif video_analysis:
+            note_features.update({
+                "has_face": bool(video_analysis.get("has_face", False)),
+            })
 
         baseline_comparison = self.baseline_comparator.compare(category, note_features)
 
@@ -139,7 +144,9 @@ class Orchestrator:
             ),
             visual_agent.diagnose(
                 title=title, category=category,
-                image_analysis=image_analysis, baseline_comparison=baseline_comparison,
+                image_analysis=image_analysis,
+                video_analysis=video_analysis,
+                baseline_comparison=baseline_comparison,
             ),
             growth_agent.diagnose(
                 title=title, content=content, category=category,
