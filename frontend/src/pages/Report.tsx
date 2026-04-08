@@ -27,14 +27,12 @@ const card = {
   p: { xs: 2.5, md: 3 },
 };
 
-function saveToLocalHistory(title: string, score: number, grade: string, category: string, report: DiagnoseResult, params: Record<string, unknown>) {
+function saveToLocalHistory(title: string, score: number, grade: string, category: string) {
   try {
     const raw = localStorage.getItem("noterx_history");
     const history = raw ? JSON.parse(raw) : [];
-    // 去重：同标题只保留最新
-    const filtered = history.filter((h: { title: string }) => h.title !== title);
-    filtered.unshift({ title, score: Math.round(score), grade, category, date: Date.now(), report, params });
-    localStorage.setItem("noterx_history", JSON.stringify(filtered.slice(0, 10)));
+    history.unshift({ title, score: Math.round(score), grade, category, date: Date.now() });
+    localStorage.setItem("noterx_history", JSON.stringify(history.slice(0, 10)));
   } catch { /* ignore */ }
 }
 
@@ -56,7 +54,7 @@ export default function Report() {
   useEffect(() => {
     document.title = `诊断报告 - 薯医 NoteRx`;
     if (state && !state.isFallback) {
-      saveToLocalHistory(state.params.title, state.report.overall_score, state.report.grade, state.params.category, state.report, state.params as Record<string, unknown>);
+      saveToLocalHistory(state.params.title, state.report.overall_score, state.report.grade, state.params.category);
       saveToServer(state.params.title, state.params.category, state.report);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
