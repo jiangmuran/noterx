@@ -22,6 +22,13 @@ import {
   deleteHistory,
 } from "../utils/api";
 import type { HistoryListItem } from "../utils/api";
+import {
+  migrateLegacyLocalStorage,
+  listLocalDiagnoses,
+  getLocalDiagnosis,
+  deleteLocalDiagnosis,
+  localRecordToListItem,
+} from "../utils/localMemory";
 
 const CATEGORY_LABEL: Record<string, string> = {
   food: "美食",
@@ -53,11 +60,45 @@ export default function History() {
 
   const fetchList = async () => {
     setLoading(true);
+    await migrateLegacyLocalStorage();
     try {
-      const list = await getHistoryList(50);
-      setItems(list);
+      const remote = await getHistoryList(50);
+      const locals = await listLocalDiagnoses();
+      const byId = new Map<string, HistoryListItem>();
+      for (const r of remote) byId.set(r.id, r);
+      for (const loc of locals) {
+        if (loc.id.startsWith("pending-") || loc.id.startsWith("legacy-")) {
+          byId.set(loc.id, localRecordToListItem(loc));
+        } else if (!byId.has(loc.id)) {
+          byId.set(loc.id, localRecordToListItem(loc));
+        }
+      }
+      const merged = Array.from(byId.values()).sort((a, b) => {
+        const ta = new Date(
+          a.created_at.includes("T") ? a.created_at : a.created_at.replace(" ", "T"),
+        ).getTime();
+        const tb = new Date(
+          b.created_at.includes("T") ? b.created_at : b.created_at.replace(" ", "T"),
+        ).getTime();
+        return tb - ta;
+      });
+      setItems(merged);
     } catch (e) {
       console.error("获取历史记录失败", e);
+      const locals = await listLocalDiagnoses();
+      setItems(
+        locals
+          .map(localRecordToListItem)
+          .sort(
+            (a, b) =>
+              new Date(
+                b.created_at.includes("T") ? b.created_at : b.created_at.replace(" ", "T"),
+              ).getTime() -
+              new Date(
+                a.created_at.includes("T") ? a.created_at : a.created_at.replace(" ", "T"),
+              ).getTime(),
+          ),
+      );
     } finally {
       setLoading(false);
     }
@@ -71,6 +112,23 @@ export default function History() {
   const handleOpen = async (item: HistoryListItem) => {
     setNavigating(item.id);
     try {
+      if (item.id.startsWith("pending-") || item.id.startsWith("legacy-")) {
+        const rec = await getLocalDiagnosis(item.id);
+        if (!rec) throw new Error("本地记录不存在");
+        const p = rec.params;
+        const title = typeof p.title === "string" ? p.title : rec.title;
+        const category = typeof p.category === "string" ? p.category : rec.category;
+        const content = typeof p.content === "string" ? p.content : undefined;
+        const tags = p.tags;
+        navigate("/report", {
+          state: {
+            report: rec.report,
+            params: { title, category, content, tags },
+            isFallback: false,
+          },
+        });
+        return;
+      }
       const detail = await getHistoryDetail(item.id);
       navigate("/report", {
         state: {
@@ -89,8 +147,16 @@ export default function History() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await deleteHistory(deleteTarget.id);
-      setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id));
+      const id = deleteTarget.id;
+      if (!id.startsWith("pending-") && !id.startsWith("legacy-")) {
+        try {
+          await deleteHistory(id);
+        } catch {
+          /* 可能仅本地仍有副本，继续删 IndexedDB */
+        }
+      }
+      await deleteLocalDiagnosis(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
     } catch (e) {
       console.error("删除失败", e);
     }

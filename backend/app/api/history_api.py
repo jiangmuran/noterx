@@ -10,6 +10,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query
 
 from app.models.schemas import HistoryCreateRequest, HistoryListItem, HistoryDetail
+from app import local_memory
 
 router = APIRouter()
 logger = logging.getLogger("noterx.history")
@@ -50,6 +51,13 @@ async def create_history(req: HistoryCreateRequest):
         raise HTTPException(500, "保存失败")
     finally:
         conn.close()
+
+    try:
+        local_memory.write_diagnosis_record(
+            record_id, req.title, req.category, float(overall_score or 0), grade or "", report
+        )
+    except Exception as e:
+        logger.warning("写入本地记忆文件失败（不影响数据库）: %s", e)
 
     return {"id": record_id}
 
@@ -133,5 +141,10 @@ async def delete_history(record_id: str):
             raise HTTPException(404, "记录不存在")
     finally:
         conn.close()
+
+    try:
+        local_memory.delete_diagnosis_record(record_id)
+    except Exception as e:
+        logger.warning("删除本地记忆文件时出错: %s", e)
 
     return {"ok": True}

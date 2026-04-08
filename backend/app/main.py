@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.api.routes import router as api_router
+from app import local_memory
 
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
 
@@ -39,6 +40,7 @@ def _ensure_history_table():
     """)
     conn.commit()
     conn.close()
+    local_memory.ensure_memory_md()
 
 
 @asynccontextmanager

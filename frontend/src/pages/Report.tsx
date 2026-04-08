@@ -9,6 +9,12 @@ import ReplayIcon from "@mui/icons-material/Replay";
 import { motion } from "framer-motion";
 import type { DiagnoseResult } from "../utils/api";
 import { saveHistory } from "../utils/api";
+import {
+  migrateLegacyLocalStorage,
+  createPendingId,
+  putLocalDiagnosis,
+  replacePendingWithServerId,
+} from "../utils/localMemory";
 import ScoreCard from "../components/ScoreCard";
 import DimensionBars from "../components/DimensionBars";
 import RadarChart from "../components/RadarChart";
@@ -27,23 +33,6 @@ const card = {
   p: { xs: 2.5, md: 3 },
 };
 
-function saveToLocalHistory(title: string, score: number, grade: string, category: string, report: DiagnoseResult, params: Record<string, unknown>) {
-  try {
-    const raw = localStorage.getItem("noterx_history");
-    const history = raw ? JSON.parse(raw) : [];
-    // 去重：同标题只保留最新
-    const filtered = history.filter((h: { title: string }) => h.title !== title);
-    filtered.unshift({ title, score: Math.round(score), grade, category, date: Date.now(), report, params });
-    localStorage.setItem("noterx_history", JSON.stringify(filtered.slice(0, 10)));
-  } catch { /* ignore */ }
-}
-
-async function saveToServer(title: string, category: string, report: DiagnoseResult) {
-  try {
-    await saveHistory({ title, category, report });
-  } catch { /* server history is best-effort */ }
-}
-
 export default function Report() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -55,10 +44,33 @@ export default function Report() {
 
   useEffect(() => {
     document.title = `诊断报告 - 薯医 NoteRx`;
-    if (state && !state.isFallback) {
-      saveToLocalHistory(state.params.title, state.report.overall_score, state.report.grade, state.params.category, state.report, state.params as Record<string, unknown>);
-      saveToServer(state.params.title, state.params.category, state.report);
-    }
+    if (!state || state.isFallback) return;
+    const { report, params } = state;
+    void (async () => {
+      await migrateLegacyLocalStorage();
+      const pendingId = createPendingId();
+      await putLocalDiagnosis({
+        id: pendingId,
+        serverId: null,
+        title: params.title,
+        category: params.category,
+        overall_score: report.overall_score,
+        grade: report.grade,
+        createdAt: Date.now(),
+        report,
+        params: params as Record<string, unknown>,
+      });
+      try {
+        const { id } = await saveHistory({
+          title: params.title,
+          category: params.category,
+          report,
+        });
+        await replacePendingWithServerId(pendingId, id);
+      } catch {
+        /* 仅保留本地 IndexedDB（pending id） */
+      }
+    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!state) {

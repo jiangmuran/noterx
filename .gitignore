@@ -34,6 +34,8 @@ Thumbs.db
 # Data
 backend/data/*.db
 *.sqlite3
+# OpenClaw 式本地记忆目录（含 Markdown 流水与 JSON 副本，默认不提交）
+backend/data/noterx_workspace/
 
 # Logs
 *.log
