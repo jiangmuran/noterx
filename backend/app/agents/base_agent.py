@@ -135,21 +135,22 @@ class BaseAgent:
         user_message: str,
         system_override: Optional[str] = None,
         model_override: Optional[str] = None,
-        max_tokens: int = 4000,
+        max_tokens: int = 2048,
     ) -> dict:
         sys_prompt = system_override or self.system_prompt
-        model = model_override or self.model
+        if model_override:
+            self.model = model_override
 
-        return await self._call_openai(sys_prompt, user_message)
+        return await self._call_openai(sys_prompt, user_message, max_tokens=max_tokens)
 
-    async def _call_openai(self, sys_prompt: str, user_message: str) -> dict:
+    async def _call_openai(self, sys_prompt: str, user_message: str, max_tokens: int = 2048) -> dict:
         """OpenAI 兼容调用（含小米 MiMo 等网关的参数与 JSON 模式兼容）。"""
         messages = [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_message},
         ]
         mimo = _is_mimo_openai_compat()
-        max_out = int(os.getenv("LLM_MAX_COMPLETION_TOKENS", "2048"))
+        max_out = max_tokens or int(os.getenv("LLM_MAX_COMPLETION_TOKENS", "2048"))
         skip_json_mode = os.getenv("LLM_SKIP_JSON_RESPONSE_FORMAT", "").strip() in ("1", "true", "yes")
 
         async def _create(with_json_object: bool):

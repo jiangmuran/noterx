@@ -15,7 +15,7 @@ from typing import Optional, Callable, Awaitable, Any
 from app.analysis.text_analyzer import TextAnalyzer
 from app.analysis.image_analyzer import ImageAnalyzer
 from app.baseline.comparator import BaselineComparator
-from app.agents.base_agent import MODEL_PRO
+from app.agents.base_agent import MODEL_PRO, MODEL_FAST
 from app.agents.research_data import pre_score
 from app.agents.content_agent import ContentAgent
 from app.agents.visual_agent import VisualAgent
@@ -263,12 +263,22 @@ class Orchestrator:
     async def _run_debate(self, opinions: list[dict], agents: list) -> tuple[list[dict], int]:
         debate_tasks = []
         for i, agent in enumerate(agents):
-            other_opinions = [op for j, op in enumerate(opinions) if j != i]
-            other_text = json.dumps(other_opinions, ensure_ascii=False, indent=2)
+            # Only pass essential fields to speed up debate
+            other_opinions = []
+            for j, op in enumerate(opinions):
+                if j != i:
+                    other_opinions.append({
+                        "agent_name": op.get("agent_name", ""),
+                        "dimension": op.get("dimension", ""),
+                        "score": op.get("score", 0),
+                        "issues": op.get("issues", [])[:3],
+                        "suggestions": op.get("suggestions", [])[:3],
+                    })
+            other_text = json.dumps(other_opinions, ensure_ascii=False)
             prompt = DEBATE_PROMPT.format(
                 agent_name=agent.agent_name, other_opinions=other_text,
             )
-            debate_tasks.append(agent.call_llm(prompt, system_override=agent.system_prompt))
+            debate_tasks.append(agent.call_llm(prompt, system_override=agent.system_prompt, model_override=MODEL_FAST, max_tokens=1024))
 
         results = await asyncio.gather(*debate_tasks, return_exceptions=True)
         debate_records = []

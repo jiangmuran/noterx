@@ -60,6 +60,6 @@ class JudgeAgent(BaseAgent):
         return msg
 
     async def diagnose(self, **kwargs) -> dict:
-        """执行综合裁判"""
+        """执行综合裁判（使用更高 token 限额）"""
         msg = self.build_user_message(**kwargs)
-        return await self.call_llm(msg)
+        return await self.call_llm(msg, max_tokens=3000)
