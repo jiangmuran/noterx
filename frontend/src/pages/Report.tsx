@@ -8,7 +8,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ReplayIcon from "@mui/icons-material/Replay";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { DiagnoseResult, PreScoreResult } from "../utils/api";
 import { saveHistory, preScore } from "../utils/api";
 import {
@@ -131,7 +131,7 @@ export default function Report() {
   const sectionAnim = (index: number) => ({
     initial: { opacity: 0, y: 16 },
     animate: visibleSections >= index ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 },
-    transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] },
+    transition: { duration: 0.4, ease: "easeOut" as const },
   });
 
   return (
