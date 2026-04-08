@@ -140,9 +140,16 @@ export default function Diagnosing() {
       >
         {/* Left: Note preview */}
         <Box sx={{ bgcolor: "#fff", border: "1px solid #f0f0f0", borderRadius: "16px", p: { xs: 2.5, md: 3 }, alignSelf: "start" }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#999", mb: 1.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            正在诊断
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              正在诊断
+            </Typography>
+            {params.coverFile?.type?.startsWith("video/") && (
+              <Box sx={{ px: 0.75, py: 0.125, borderRadius: "4px", bgcolor: "#fff0f1" }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#ff2442" }}>视频笔记</Typography>
+              </Box>
+            )}
+          </Box>
           <Typography sx={{ fontSize: { xs: 16, md: 18 }, fontWeight: 700, color: "#262626", lineHeight: 1.5, mb: 1.5 }}>
             {params.title || "截图识别中..."}
           </Typography>
