@@ -15,7 +15,6 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { motion } from "framer-motion";
 import {
   getHistoryList,
@@ -26,7 +25,7 @@ import type { HistoryListItem } from "../utils/api";
 
 const CATEGORY_LABEL: Record<string, string> = {
   food: "美食",
-  fashion: "穿搭",
+  fashion: "时尚",
   tech: "科技",
   travel: "旅行",
   beauty: "美妆",
@@ -57,8 +56,8 @@ export default function History() {
     try {
       const list = await getHistoryList(50);
       setItems(list);
-    } catch {
-      setItems([]);
+    } catch (e) {
+      console.error("获取历史记录失败", e);
     } finally {
       setLoading(false);
     }
@@ -68,6 +67,7 @@ export default function History() {
     fetchList();
   }, []);
 
+  /** 点击卡片：加载完整报告后跳转 Report 页 */
   const handleOpen = async (item: HistoryListItem) => {
     setNavigating(item.id);
     try {
@@ -79,19 +79,22 @@ export default function History() {
           isFallback: false,
         },
       });
-    } finally {
+    } catch (e) {
+      console.error("获取报告详情失败", e);
       setNavigating(null);
     }
   };
 
+  /** 确认删除 */
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
       await deleteHistory(deleteTarget.id);
-      setItems((prev) => prev.filter((item) => item.id !== deleteTarget.id));
-    } finally {
-      setDeleteTarget(null);
+      setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id));
+    } catch (e) {
+      console.error("删除失败", e);
     }
+    setDeleteTarget(null);
   };
 
   const formatTime = (ts: string) => {
@@ -129,12 +132,12 @@ export default function History() {
           }}
         >
           <Button
-            startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
+            startIcon={<ArrowBackIcon />}
             onClick={() => navigate("/")}
             size="small"
             sx={{ color: "#262626" }}
           >
-            返回
+            首页
           </Button>
           <Typography sx={{ fontWeight: 700, color: "#262626", fontSize: 16 }}>
             诊断历史
@@ -266,28 +269,6 @@ export default function History() {
                       <CircularProgress size={16} sx={{ color: "#999" }} />
                     )}
 
-                    <Button
-                      size="small"
-                      variant="text"
-                      startIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
-                      sx={{
-                        color: "#666",
-                        minWidth: "unset",
-                        px: 0.5,
-                        textTransform: "none",
-                        fontSize: 12,
-                        flexShrink: 0,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!navigating) {
-                          handleOpen(item);
-                        }
-                      }}
-                    >
-                      查看结果
-                    </Button>
-
                     {/* 删除按钮 */}
                     <IconButton
                       size="small"
@@ -311,6 +292,7 @@ export default function History() {
         )}
       </Box>
 
+      {/* 删除确认对话框 */}
       <Dialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}

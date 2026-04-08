@@ -93,9 +93,7 @@ export async function diagnoseNote(
     formData.append("cover_image", params.coverImage);
   }
   if (params.coverImages && params.coverImages.length > 0) {
-    params.coverImages.forEach((file) => {
-      formData.append("cover_images", file);
-    });
+    params.coverImages.forEach((file) => formData.append("cover_images", file));
   }
   if (params.videoFile) {
     formData.append("video_file", params.videoFile);

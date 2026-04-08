@@ -1,71 +1,9 @@
-/* Airbnb + Apple 融合设计系统 */
-/* 温暖、精致、内容优先 */
+/* NoteRx — Minimal Global Styles */
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
-}
-
-:root {
-  color-scheme: light;
-  
-  /* 核心颜色 - 温暖调性 */
-  --color-primary: #e11d48;
-  --color-primary-light: #fb7185;
-  --color-primary-dark: #be123c;
-  
-  /* 背景层次 */
-  --bg-base: #fafaf9;
-  --bg-elevated: #ffffff;
-  --bg-hover: #f5f5f4;
-  
-  /* 文字颜色 */
-  --text-primary: #18181b;
-  --text-secondary: #71717a;
-  --text-tertiary: #a1a1aa;
-  --text-muted: #d4d4d8;
-  
-  /* 边框 */
-  --border-subtle: rgba(0, 0, 0, 0.06);
-  --border-standard: rgba(0, 0, 0, 0.1);
-  --border-prominent: rgba(0, 0, 0, 0.15);
-  
-  /* Airbnb 三层阴影系统 */
-  --shadow-border: rgba(0, 0, 0, 0.02) 0px 0px 0px 1px;
-  --shadow-ambient: rgba(0, 0, 0, 0.04) 0px 2px 6px;
-  --shadow-lift: rgba(0, 0, 0, 0.06) 0px 4px 8px;
-  --shadow-card: rgba(0, 0, 0, 0.02) 0px 0px 0px 1px, rgba(0, 0, 0, 0.04) 0px 2px 6px, rgba(0, 0, 0, 0.06) 0px 4px 8px;
-  --shadow-hover: rgba(0, 0, 0, 0.06) 0px 4px 12px;
-  --shadow-elevated: rgba(0, 0, 0, 0.08) 0px 8px 24px;
-  --shadow-modal: rgba(0, 0, 0, 0.12) 0px 24px 60px;
-  
-  /* 间距系统 (8px base) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
-  
-  /* 圆角 (Airbnb 风格大圆角) */
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
-  --radius-full: 9999px;
-  
-  /* 字体 */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-  
-  /* 动画曲线 */
-  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 html {
@@ -76,25 +14,20 @@ html {
 body {
   margin: 0;
   padding: 0;
-  font-family: var(--font-sans);
-  background-color: var(--bg-base);
-  color: var(--text-primary);
-  line-height: 1.6;
-  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
-/* 选中文本 */
 ::selection {
-  background-color: rgba(225, 29, 72, 0.15);
-  color: var(--text-primary);
+  background-color: rgba(255, 36, 66, 0.15);
+  color: #262626;
 }
 
-/* 滚动条 - 极简 */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -102,8 +35,8 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -112,187 +45,11 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
 }
 
-/* 排版工具类 */
-.text-display {
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.1;
-}
-
-.text-heading {
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  line-height: 1.25;
-}
-
-.text-body {
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  line-height: 1.6;
-}
-
-.text-muted {
-  color: var(--text-secondary);
-}
-
-/* 渐变文字 */
-.gradient-text {
-  background: linear-gradient(135deg, #e11d48 0%, #fb7185 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* 卡片悬浮效果 */
-.card-hover {
-  transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
-}
-
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
-}
-
-/* 按钮悬浮提升 */
-.btn-lift {
-  transition: all 0.2s var(--ease-out);
-}
-
-.btn-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-elevated);
-}
-
-/* 聚焦状态 */
-.focus-ring:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.2);
-}
-
-/* 玻璃效果 (Apple 风格) */
-.glass {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
-
-.glass-dark {
-  background: rgba(24, 24, 27, 0.85);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
-
-/* 图片容器 */
-.img-cover {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* 单行截断 */
-.truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 多行截断 */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* 淡入动画 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-in {
-  animation: fadeIn 0.5s var(--ease-out) forwards;
-}
-
-/* 交错淡入 */
-.stagger-children > * {
-  opacity: 0;
-  animation: fadeIn 0.5s var(--ease-out) forwards;
-}
-
-.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
-
-/* 脉冲动画 */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* 加载 shimmer */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.03) 25%,
-    rgba(0, 0, 0, 0.08) 50%,
-    rgba(0, 0, 0, 0.03) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-/* 基础元素重置 */
 img {
   max-width: 100%;
   height: auto;
   display: block;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-button {
-  font-family: inherit;
-}
-
-/* 隐藏滚动条但保留功能 */
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
 }
