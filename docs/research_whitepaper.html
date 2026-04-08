@@ -13,7 +13,7 @@ html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.65;overflow-x:hidden}
 
 /* ━━ Hero ━━ */
-.hero{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;text-align:center;padding:2rem 1.5rem;background:#fff;position:relative}
+.hero{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;text-align:center;padding:2rem 1.5rem;background:linear-gradient(180deg,#fafafa 0%,#fff 100%);position:relative}
 .hero-inner{max-width:500px}
 .hero .badge{display:inline-block;padding:0.3rem 0.9rem;border-radius:100px;background:var(--red-light);color:var(--red);font-size:0.72rem;font-weight:700;letter-spacing:0.08em;margin-bottom:1.8rem}
 .hero h1{font-size:clamp(2.2rem,8vw,4rem);font-weight:900;color:var(--ink);line-height:1.15;letter-spacing:-0.03em}
@@ -102,9 +102,6 @@ footer{text-align:center;padding:3rem 1.5rem;background:var(--ink);color:rgba(25
 footer .team{font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.3rem}
 footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
 
-/* ━━ Floating CTA ━━ */
-.float-cta{position:fixed;bottom:1.5rem;right:1.5rem;z-index:999}
-.float-cta .btn-red{font-size:0.85rem;padding:0.6rem 1.4rem;box-shadow:0 6px 24px rgba(255,36,66,0.35)}
 
 /* ━━ Launch overlay ━━ */
 #launch-overlay{position:fixed;inset:0;z-index:99999;pointer-events:none;background:#fff;opacity:0;transition:opacity 0.3s ease;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.8rem}
@@ -133,8 +130,6 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
   .hero h1{font-size:1.7rem}
   .hero .num-item .n{font-size:1.3rem}
   .tbl{display:block;overflow-x:auto}
-  .float-cta{bottom:1rem;right:1rem}
-  .float-cta .btn-red{font-size:0.78rem;padding:0.5rem 1rem}
   .bar-row .lbl{min-width:36px;font-size:0.7rem}
 }
 </style>
@@ -147,10 +142,8 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
     <div class="badge">薯医 NoteRx</div>
     <h1>用数据拆解<br>小红书的<span class="red">爆款密码</span></h1>
     <p class="sub">
-      <strong>传统统计分析</strong>（Spearman 相关 · 线性回归 · K-Means 聚类）<br>
-      <strong>+</strong><br>
-      <strong>大模型深度理解</strong>（内容语义 · 封面视觉 · 用户画像 · 评论情绪）<br>
-      <span style="margin-top:0.5rem;display:inline-block">基于 <strong>874 条真实笔记 + 2500 条评论</strong>，双轨验证每一条诊断建议</span>
+      <strong>传统回归聚类分析 + LLM 拆解内容逻辑</strong><br>
+      基于 <strong>874 条真实笔记 + 2500 条评论</strong>，双轨验证每一条诊断建议
     </p>
     <div class="nums" style="margin-top:2rem">
       <div class="num-item"><div class="n" data-c="874">0</div><div class="l">真实笔记</div></div>
@@ -496,7 +489,6 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
 </section>
 
 <!-- ━━ FOOTER ━━ -->
-<div class="float-cta"><a href="/app" onclick="return go(event)" class="btn btn-red">立即诊断</a></div>
 
 <footer>
   <div style="margin-bottom:1.2rem"><a href="/app" onclick="return go(event)" class="btn btn-red" style="font-size:1rem">开始诊断你的笔记</a></div>
