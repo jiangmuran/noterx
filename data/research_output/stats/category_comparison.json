@@ -1,0 +1,27 @@
+{
+  "title_length": {
+    "H_statistic": 7.5753,
+    "p_value": 0.055655,
+    "significant": false
+  },
+  "tag_count": {
+    "H_statistic": 19.2189,
+    "p_value": 0.000246,
+    "significant": true
+  },
+  "content_length": {
+    "H_statistic": 6.8479,
+    "p_value": 0.076906,
+    "significant": false
+  },
+  "image_count": {
+    "H_statistic": 43.773,
+    "p_value": 0.0,
+    "significant": true
+  },
+  "engagement": {
+    "H_statistic": 184.9442,
+    "p_value": 0.0,
+    "significant": true
+  }
+}
