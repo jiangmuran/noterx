@@ -198,4 +198,90 @@ export async function deleteHistory(id: string): Promise<void> {
   await api.delete(`/history/${id}`);
 }
 
+// --------------- 截图分析 ---------------
+
+export type SlotType = "cover" | "content" | "profile" | "comments";
+
+export interface QuickRecognizeResult {
+  success: boolean;
+  slot_type: string;
+  category: string;
+  summary: string;
+  confidence?: number;
+  error?: string;
+}
+
+export interface DeepAnalysisResult {
+  scenario: string;
+  slot_count: number;
+  extra_text: string;
+  video_info: { filename: string; size_mb: number; content_type: string } | null;
+  analyses: Record<string, Record<string, unknown>>;
+  overall: {
+    completeness: number;
+    scenario: string;
+    tips: string[];
+    slots_analyzed: string[];
+  };
+}
+
+/**
+ * 上传单张截图进行 AI 快速识别
+ * @param file - 图片文件
+ * @param slotHint - 位置提示
+ */
+export async function quickRecognize(
+  file: File,
+  slotHint?: SlotType
+): Promise<QuickRecognizeResult> {
+  const fd = new FormData();
+  fd.append("file", file);
+  if (slotHint) fd.append("slot_hint", slotHint);
+  const { data } = await api.post<QuickRecognizeResult>(
+    "/screenshot/quick-recognize",
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return data;
+}
+
+/**
+ * 提交完整图包进行深度分析
+ * @param params - 包含 scenario 和各维度截图
+ */
+export async function deepAnalyze(params: {
+  scenario: "pre_publish" | "post_publish";
+  cover?: File;
+  contentImg?: File;
+  profile?: File;
+  comments?: File;
+  video?: File;
+  extraText?: string;
+}): Promise<DeepAnalysisResult> {
+  const fd = new FormData();
+  fd.append("scenario", params.scenario);
+  if (params.cover) fd.append("cover", params.cover);
+  if (params.contentImg) fd.append("content_img", params.contentImg);
+  if (params.profile) fd.append("profile", params.profile);
+  if (params.comments) fd.append("comments", params.comments);
+  if (params.video) fd.append("video", params.video);
+  if (params.extraText) fd.append("extra_text", params.extraText);
+  const { data } = await api.post<DeepAnalysisResult>(
+    "/screenshot/deep-analyze",
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" }, timeout: 180000 }
+  );
+  return data;
+}
+
+/**
+ * 过滤文本中的链接
+ */
+export async function stripLinks(text: string): Promise<string> {
+  const fd = new FormData();
+  fd.append("text", text);
+  const { data } = await api.post<{ cleaned: string }>("/text/strip-links", fd);
+  return data.cleaned;
+}
+
 export default api;
