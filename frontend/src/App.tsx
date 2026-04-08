@@ -23,6 +23,20 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route
+          path="/app"
+          element={
+            <motion.div
+              variants={pageTransition}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              style={{ minHeight: "100vh" }}
+            >
+              <Home />
+            </motion.div>
+          }
+        />
+        <Route
           path="/"
           element={
             <motion.div

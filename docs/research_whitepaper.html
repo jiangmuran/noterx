@@ -162,6 +162,78 @@
     transform: translateY(-2px);
   }
 
+  /* ── Launch transition overlay ── */
+  .launch-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+
+  .launch-overlay.active {
+    pointer-events: all;
+    opacity: 1;
+  }
+
+  .launch-overlay .circle {
+    width: 0; height: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #059669);
+    transition: all 0.7s cubic-bezier(0.4, 0, 0, 1);
+    position: absolute;
+  }
+
+  .launch-overlay.active .circle {
+    width: 300vmax; height: 300vmax;
+    border-radius: 0;
+  }
+
+  .launch-overlay .launch-content {
+    position: relative;
+    z-index: 1;
+    color: white;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.4s 0.35s, transform 0.4s 0.35s;
+  }
+
+  .launch-overlay.active .launch-content {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .launch-overlay .launch-logo {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+  }
+
+  .launch-overlay .launch-sub {
+    font-size: 1rem;
+    opacity: 0.7;
+    font-weight: 300;
+  }
+
+  .launch-overlay .launch-spinner {
+    width: 32px; height: 32px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-top: 1.5rem;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   .scroll-hint {
     position: absolute;
     bottom: 2rem;
@@ -551,7 +623,7 @@
       <div class="stat-pill"><span class="num counter" data-target="25">0</span>条AI提示词</div>
     </div>
     <div class="cta-row">
-      <a href="/" class="cta-btn primary">🩺 开始诊断笔记</a>
+      <a href="/app" onclick="return launchApp(event)" class="cta-btn primary">🩺 开始诊断笔记</a>
       <a href="#findings" class="cta-btn secondary">📊 查看研究成果 ↓</a>
     </div>
   </div>
@@ -1121,7 +1193,7 @@
     </div>
 
     <div style="text-align: center; margin-top: 1.5rem;" class="reveal">
-      <a href="/" class="cta-btn primary">🩺 获取完整 AI 诊断报告（5 位 Agent 深度分析）</a>
+      <a href="/app" onclick="return launchApp(event)" class="cta-btn primary">🩺 获取完整 AI 诊断报告（5 位 Agent 深度分析）</a>
     </div>
   </div>
 </section>
@@ -1157,14 +1229,14 @@
 
 <!-- Floating CTA -->
 <div style="position:fixed;bottom:2rem;right:2rem;z-index:999;">
-  <a href="/" class="cta-btn primary" style="box-shadow:0 8px 30px rgba(0,0,0,0.3);font-size:0.95rem;">
+  <a href="/app" onclick="return launchApp(event)" class="cta-btn primary" style="box-shadow:0 8px 30px rgba(0,0,0,0.3);font-size:0.95rem;">
     🩺 立即诊断
   </a>
 </div>
 
 <footer>
   <div style="margin-bottom:1.5rem">
-    <a href="/" class="cta-btn primary" style="font-size:1.1rem;">🩺 开始诊断你的笔记</a>
+    <a href="/app" onclick="return launchApp(event)" class="cta-btn primary" style="font-size:1.1rem;">🩺 开始诊断你的笔记</a>
   </div>
   <div class="team">Team PageOne</div>
   <p>姜睦然 · 杨星泽 · 王翔远 · 庞然</p>
@@ -1173,8 +1245,39 @@
   </p>
 </footer>
 
+<!-- ════════════ LAUNCH OVERLAY ════════════ -->
+<div class="launch-overlay" id="launch-overlay">
+  <div class="circle"></div>
+  <div class="launch-content">
+    <div class="launch-logo">🩺 NoteRx</div>
+    <div class="launch-sub">正在启动 AI 诊断系统...</div>
+    <div class="launch-spinner"></div>
+  </div>
+</div>
+
 <!-- ════════════ SCRIPTS ════════════ -->
 <script>
+// ── Launch transition ──
+function launchApp(e) {
+  e.preventDefault();
+  const overlay = document.getElementById('launch-overlay');
+  const circle = overlay.querySelector('.circle');
+
+  // Position circle at click point
+  const rect = e.currentTarget.getBoundingClientRect();
+  circle.style.left = (rect.left + rect.width/2) + 'px';
+  circle.style.top = (rect.top + rect.height/2) + 'px';
+
+  overlay.classList.add('active');
+
+  // Navigate after animation completes
+  setTimeout(() => {
+    window.location.href = '/app';
+  }, 1100);
+
+  return false;
+}
+
 // Counter animation
 function animateCounters() {
   document.querySelectorAll('.counter').forEach(el => {

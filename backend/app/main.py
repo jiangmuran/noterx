@@ -69,42 +69,51 @@ app.add_middleware(
 
 app.include_router(api_router, prefix="/api")
 
-# Serve research whitepaper page
+# ── Landing page: research whitepaper at / ──
 RESEARCH_HTML = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "research_whitepaper.html")
+
+@app.get("/")
+async def serve_landing():
+    """首页 → 研究白皮书着陆页"""
+    if os.path.isfile(RESEARCH_HTML):
+        return FileResponse(RESEARCH_HTML, media_type="text/html")
+    # Fallback: serve SPA if whitepaper not found
+    if os.path.isdir(FRONTEND_DIST):
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+    return {"status": "ok", "service": "NoteRx API"}
 
 @app.get("/research")
 async def serve_research():
+    """兼容旧链接"""
     if os.path.isfile(RESEARCH_HTML):
         return FileResponse(RESEARCH_HTML, media_type="text/html")
     return {"error": "Research page not found"}
 
-# Serve frontend static files if built
+# ── SPA: product app at /app and sub-routes ──
+SPA_ROUTES = {"/app", "/diagnosing", "/report", "/history", "/screenshot"}
+
 if os.path.isdir(FRONTEND_DIST):
     from starlette.middleware.base import BaseHTTPMiddleware
-    from starlette.responses import Response as StarletteResponse
 
     class SPAMiddleware(BaseHTTPMiddleware):
-        """Serve SPA for non-API, non-static routes"""
+        """Serve SPA index.html for /app and its sub-routes"""
         async def dispatch(self, request, call_next):
             response = await call_next(request)
             path = request.url.path
             if (response.status_code == 404
                     and not path.startswith("/api")
                     and not path.startswith("/assets")
-                    and path != "/research"):
+                    and path not in ("/", "/research")):
                 return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
             return response
 
     app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="static")
     app.add_middleware(SPAMiddleware)
 
-    @app.get("/")
-    async def serve_index():
+    @app.get("/app")
+    async def serve_app():
+        """产品主页面"""
         return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
-else:
-    @app.get("/")
-    async def root():
-        return {"status": "ok", "service": "NoteRx API", "hint": "Run 'cd frontend && npm run build' to enable SPA serving"}
 
 
 @app.get("/api/health")
