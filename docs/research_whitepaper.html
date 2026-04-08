@@ -103,12 +103,17 @@ footer .team{font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.3rem}
 footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
 
 
-/* ━━ Launch overlay ━━ */
-#launch-overlay{position:fixed;inset:0;z-index:99999;pointer-events:none;background:#fff;opacity:0;transition:opacity 0.3s ease;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.8rem}
+/* ━━ Sticky CTA (appears after scrolling past hero) ━━ */
+.sticky-cta{position:fixed;bottom:1.5rem;left:50%;z-index:998;transform:translateX(-50%) translateY(80px);opacity:0;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s;pointer-events:none}
+.sticky-cta.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:all}
+.sticky-cta .btn-red{box-shadow:0 6px 28px rgba(255,36,66,0.4);padding:0.7rem 2rem;font-size:0.9rem}
+
+/* ━━ Launch overlay (red fullscreen) ━━ */
+#launch-overlay{position:fixed;inset:0;z-index:99999;pointer-events:none;background:var(--red);opacity:0;transition:opacity 0.3s ease;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.6rem}
 #launch-overlay.go{opacity:1;pointer-events:all}
-#launch-overlay .lo-name{font-size:1.5rem;font-weight:900;color:var(--red);opacity:0;transform:translateY(8px);transition:opacity 0.3s 0.15s,transform 0.3s 0.15s}
+#launch-overlay .lo-name{font-size:1.6rem;font-weight:900;color:#fff;opacity:0;transform:translateY(8px);transition:opacity 0.3s 0.15s,transform 0.3s 0.15s}
 #launch-overlay.go .lo-name{opacity:1;transform:none}
-#launch-overlay .lo-spin{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:sp 0.7s linear infinite;opacity:0;transition:opacity 0.2s 0.25s}
+#launch-overlay .lo-spin{width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp 0.7s linear infinite;opacity:0;transition:opacity 0.2s 0.25s}
 #launch-overlay.go .lo-spin{opacity:1}
 @keyframes sp{to{transform:rotate(360deg)}}
 
@@ -143,11 +148,11 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
     <h1>用数据拆解<br>小红书的<span class="red">爆款密码</span></h1>
     <p class="sub">
       <strong>传统回归聚类分析 + LLM 拆解内容逻辑</strong><br>
-      基于 <strong>874 条真实笔记 + 2500 条评论</strong>，双轨验证每一条诊断建议
+      基于 <strong>874 条真实笔记 + 2500+ 条评论</strong>，双轨验证每一条诊断建议
     </p>
     <div class="nums" style="margin-top:2rem">
       <div class="num-item"><div class="n" data-c="874">0</div><div class="l">真实笔记</div></div>
-      <div class="num-item"><div class="n" data-c="2500">0</div><div class="l">条评论</div></div>
+      <div class="num-item"><div class="n" data-c="2500">0</div><div class="l">条评论+</div></div>
       <div class="num-item"><div class="n" data-c="5">0</div><div class="l">个品类</div></div>
       <div class="num-item"><div class="n" data-c="5">0</div><div class="l">位 AI Agent</div></div>
     </div>
@@ -169,7 +174,7 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
       内容分析师、视觉诊断师、增长策略师、用户模拟器、综合裁判，五个维度像专家会诊一样针锋相对，最终输出量化评分和可执行的优化方案。
     </p>
     <p class="lead">
-      每一条诊断建议背后，都有 <strong>874 条真实小红书笔记 + 2500 条评论</strong>的数据支撑。
+      每一条诊断建议背后，都有 <strong>874 条真实小红书笔记 + 2500+ 条评论</strong>的数据支撑。
       我们用 Spearman 相关、线性回归、K-Means 聚类、LLM 深度分析建立了品类差异化的评分基线——不猜，不编，用数据说话。
     </p>
   </div>
@@ -189,7 +194,7 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
       <p>从数据采集到模型验证，48 小时内完成的完整数据科学研究。</p>
     </div>
     <div class="tl rv">
-      <div class="tl-item"><div class="step">Step 1 · 数据采集</div><h4>874 条笔记 + 2500 条评论</h4><p>覆盖美食、穿搭、科技、旅游、生活 5 大品类。24 个 xlsx 文件自动导入，统一字段映射。</p></div>
+      <div class="tl-item"><div class="step">Step 1 · 数据采集</div><h4>874 条笔记 + 2500+ 条评论</h4><p>覆盖美食、穿搭、科技、旅游、生活 5 大品类。24 个 xlsx 文件自动导入，统一字段映射。</p></div>
       <div class="tl-item"><div class="step">Step 2 · 传统统计</div><h4>7 种方法 × 5 个品类 = 35 组分析</h4><p>Spearman 相关 → 线性回归 → Kruskal-Wallis 检验 → K-Means 聚类 + PCA 可视化。</p></div>
       <div class="tl-item"><div class="step">Step 3 · LLM 分析</div><h4>3 个模型 × 3 种维度</h4><p>mimo-v2-pro 分析内容模式，mimo-v2-omni 理解封面视觉，mimo-v2-flash 分类 2465 条评论。</p></div>
       <div class="tl-item"><div class="step">Step 4 · 模型构建</div><h4>回归系数 → 品类权重 → 评分引擎</h4><p>将统计结果转化为 5 维度评分权重，每个品类独立参数，构建可运行的评分模型。</p></div>
@@ -502,6 +507,12 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
 </footer>
 
 <!-- ━━ OVERLAY ━━ -->
+<!-- ━━ STICKY CTA (shows after hero scroll) ━━ -->
+<div class="sticky-cta" id="sticky-cta">
+  <a href="/app" onclick="return go(event)" class="btn btn-red">立即诊断</a>
+</div>
+
+<!-- ━━ LAUNCH OVERLAY (red fullscreen) ━━ -->
 <div id="launch-overlay">
   <div class="lo-name">薯医 NoteRx</div>
   <div class="lo-spin"></div>
@@ -532,6 +543,12 @@ document.querySelectorAll('.rv').forEach(function(el){obs.observe(el)});
 
 // Counter on hero visible
 new IntersectionObserver(function(es){if(es[0].isIntersecting)counters()},{threshold:0.3}).observe(document.querySelector('.hero'));
+
+// Sticky CTA: show when hero scrolls out of view
+var stickyCta=document.getElementById('sticky-cta');
+new IntersectionObserver(function(es){
+  stickyCta.classList.toggle('show',!es[0].isIntersecting);
+},{threshold:0}).observe(document.querySelector('.hero'));
 
 // Demo scoring
 var MP={
