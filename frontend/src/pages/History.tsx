@@ -296,10 +296,12 @@ export default function History() {
       <Dialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        PaperProps={{
-          sx: {
-            borderRadius: "12px",
-            maxWidth: 360,
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: "12px",
+              maxWidth: 360,
+            },
           },
         }}
       >
