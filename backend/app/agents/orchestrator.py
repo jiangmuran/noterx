@@ -301,6 +301,7 @@ class Orchestrator:
                     "avatar_emoji": c.get("avatar_emoji", "😊"),
                     "comment": c.get("comment", ""),
                     "sentiment": c.get("sentiment", "neutral"),
+                    "likes": int(c.get("likes", 0)) if c.get("likes") is not None else 0,
                 })
 
         cover_dir = final_report.get("cover_direction")

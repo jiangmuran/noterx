@@ -29,12 +29,14 @@ COMMENT_PROMPT = """你是小红书评论区模拟器。根据给定的笔记信
       "avatar_emoji": "一个表情",
       "comment": "评论内容",
       "sentiment": "positive/negative/neutral",
+      "likes": 预估点赞数(整数,热评50-500,普通0-50),
       "replies": [
         {
           "username": "回复者昵称",
           "avatar_emoji": "表情",
           "comment": "回复内容",
-          "sentiment": "positive/negative/neutral"
+          "sentiment": "positive/negative/neutral",
+          "likes": 预估点赞数(整数)
         }
       ]
     }
@@ -85,12 +87,14 @@ async def generate_comments(req: GenerateCommentsRequest):
                     "avatar_emoji": r.get("avatar_emoji", "😊"),
                     "comment": r.get("comment", ""),
                     "sentiment": r.get("sentiment", "neutral"),
+                    "likes": int(r.get("likes", 0)) if r.get("likes") is not None else 0,
                 })
         formatted.append({
             "username": c.get("username", "小红薯用户"),
             "avatar_emoji": c.get("avatar_emoji", "😊"),
             "comment": c.get("comment", ""),
             "sentiment": c.get("sentiment", "neutral"),
+            "likes": int(c.get("likes", 0)) if c.get("likes") is not None else 0,
             "replies": replies,
         })
 

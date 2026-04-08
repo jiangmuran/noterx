@@ -33,6 +33,7 @@ export interface SimulatedComment {
   avatar_emoji: string;
   comment: string;
   sentiment: "positive" | "negative" | "neutral";
+  likes?: number;
 }
 
 export interface DebateEntry {
