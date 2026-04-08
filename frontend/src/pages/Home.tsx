@@ -8,6 +8,7 @@ import {
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import CameraAltOutlined from "@mui/icons-material/CameraAltOutlined";
 import LinkIcon from "@mui/icons-material/Link";
+import HistoryOutlined from "@mui/icons-material/HistoryOutlined";
 import HistoryIcon from "@mui/icons-material/History";
 import CategoryPicker from "../components/CategoryPicker";
 import UploadZone from "../components/UploadZone";
@@ -80,10 +81,22 @@ export default function Home() {
     return () => window.removeEventListener("paste", handlePaste);
   }, []);
 
+  useEffect(() => { document.title = "薯医 NoteRx"; }, []);
+
   const canSubmit = mode === "screenshot" ? coverFile !== null : title.trim().length > 0;
 
   const handleSubmit = () => {
+    if (!canSubmit) return;
     navigate("/diagnosing", { state: { title, content, tags, category, coverFile } });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey && canSubmit && mode === "text") {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "TEXTAREA") return;
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   const fillSample = (s: typeof SAMPLES[0]) => {
@@ -125,7 +138,16 @@ export default function Home() {
       transition={{ duration: 0.4 }}
       sx={{ minHeight: "100vh", bgcolor: "#fafafa", display: "flex", flexDirection: "column", alignItems: "center", px: 2, py: { xs: 5, md: 8 } }}
     >
-      {/* Logo */}
+      {/* Header */}
+      <Box sx={{ width: "100%", maxWidth: 520, display: "flex", justifyContent: "flex-end", mb: 1 }}>
+        <Button
+          startIcon={<HistoryOutlined sx={{ fontSize: 16 }} />}
+          onClick={() => navigate("/history")}
+          sx={{ color: "#999", fontSize: 13, fontWeight: 500, "&:hover": { color: "#262626" } }}
+        >
+          历史记录
+        </Button>
+      </Box>
       <Box sx={{ textAlign: "center", mb: { xs: 3, md: 4 } }}>
         <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, mb: 0.5 }}>
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -138,7 +160,7 @@ export default function Home() {
       </Box>
 
       {/* Input card */}
-      <Box sx={{ width: "100%", maxWidth: 520, bgcolor: "#fff", border: "1px solid #f0f0f0", borderRadius: "16px", boxShadow: "0 1px 8px rgba(0,0,0,0.04)", overflow: "hidden" }}>
+      <Box onKeyDown={handleKeyDown} sx={{ width: "100%", maxWidth: 520, bgcolor: "#fff", border: "1px solid #f0f0f0", borderRadius: "16px", boxShadow: "0 1px 8px rgba(0,0,0,0.04)", overflow: "hidden" }}>
         <Tabs
           value={tabIndex}
           onChange={(_, v) => setMode((["text", "screenshot", "link"] as InputMode[])[v])}

@@ -32,6 +32,7 @@ export default function Diagnosing() {
   const resultRef = useRef<{ report: unknown; isFallback: boolean } | null>(null);
 
   useEffect(() => {
+    document.title = "诊断中... - 薯医 NoteRx";
     if (!params) { navigate("/"); return; }
     let cancelled = false;
 

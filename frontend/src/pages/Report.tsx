@@ -5,8 +5,10 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ReplayIcon from "@mui/icons-material/Replay";
 import { motion } from "framer-motion";
 import type { DiagnoseResult } from "../utils/api";
+import { saveHistory } from "../utils/api";
 import ScoreCard from "../components/ScoreCard";
 import DimensionBars from "../components/DimensionBars";
 import RadarChart from "../components/RadarChart";
@@ -25,13 +27,19 @@ const card = {
   p: { xs: 2.5, md: 3 },
 };
 
-function saveToHistory(title: string, score: number, grade: string, category: string) {
+function saveToLocalHistory(title: string, score: number, grade: string, category: string) {
   try {
     const raw = localStorage.getItem("noterx_history");
     const history = raw ? JSON.parse(raw) : [];
     history.unshift({ title, score: Math.round(score), grade, category, date: Date.now() });
     localStorage.setItem("noterx_history", JSON.stringify(history.slice(0, 10)));
   } catch { /* ignore */ }
+}
+
+async function saveToServer(title: string, category: string, report: DiagnoseResult) {
+  try {
+    await saveHistory({ title, category, report });
+  } catch { /* server history is best-effort */ }
 }
 
 export default function Report() {
@@ -44,8 +52,10 @@ export default function Report() {
   } | null;
 
   useEffect(() => {
+    document.title = `诊断报告 - 薯医 NoteRx`;
     if (state && !state.isFallback) {
-      saveToHistory(state.params.title, state.report.overall_score, state.report.grade, state.params.category);
+      saveToLocalHistory(state.params.title, state.report.overall_score, state.report.grade, state.params.category);
+      saveToServer(state.params.title, state.params.category, state.report);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -76,16 +86,20 @@ export default function Report() {
       <Box sx={{ position: "sticky", top: 0, zIndex: 50, bgcolor: "#fff", borderBottom: "1px solid #f0f0f0" }}>
         <Box sx={{ maxWidth: 960, mx: "auto", px: { xs: 2, md: 3 }, py: 1.25, display: "flex", alignItems: "center" }}>
           <Button
-            startIcon={<ArrowBackIcon sx={{ fontSize: 18 }} />}
+            startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
             onClick={() => navigate("/")}
             sx={{ color: "#999", fontWeight: 500, fontSize: 13, "&:hover": { color: "#262626" } }}
           >
-            重新诊断
+            首页
           </Button>
-          <Box sx={{ flex: 1 }} />
           <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626" }}>诊断报告</Typography>
-          <Box sx={{ flex: 1 }} />
-          <Box sx={{ width: 100 }} />
+          <Button
+            startIcon={<ReplayIcon sx={{ fontSize: 16 }} />}
+            onClick={() => navigate("/diagnosing", { state: params })}
+            sx={{ color: "#999", fontWeight: 500, fontSize: 13, "&:hover": { color: "#262626" } }}
+          >
+            再次诊断
+          </Button>
         </Box>
       </Box>
 
@@ -131,7 +145,23 @@ export default function Report() {
           {/* Row 3: Optimized content */}
           {(report.optimized_title || report.optimized_content || report.cover_direction) && (
             <Box sx={{ ...card, mb: 2 }}>
-              <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626", mb: 2 }}>AI 优化方案</Typography>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626" }}>AI 优化方案</Typography>
+                {report.optimized_title && report.optimized_content && (
+                  <Button
+                    size="small"
+                    startIcon={<ContentCopyIcon sx={{ fontSize: 14 }} />}
+                    onClick={() => {
+                      const all = `标题：${report.optimized_title}\n\n${report.optimized_content}`;
+                      navigator.clipboard.writeText(all);
+                      showToast("已复制标题和正文");
+                    }}
+                    sx={{ color: "#999", fontSize: 12, "&:hover": { color: "#262626" } }}
+                  >
+                    复制全部
+                  </Button>
+                )}
+              </Box>
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 1.5 }}>
                 {report.optimized_title && (
                   <Box sx={{ p: 2, borderRadius: "12px", bgcolor: "#fafafa", border: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", gap: 1 }}>
