@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+:root {
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #172033;
+  background:
+    radial-gradient(circle at top left, #ffd9b8 0%, transparent 34%),
+    radial-gradient(circle at right 20%, #ffe7cf 0%, transparent 30%),
+    linear-gradient(180deg, #fff8f1 0%, #fffdf9 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.page-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.hero-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.hero-copy,
+.hero-card,
+.module-card {
+  border: 1px solid rgba(214, 132, 52, 0.18);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 18px 40px rgba(180, 115, 32, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.hero-copy {
+  padding: 36px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c96b18;
+}
+
+.hero-copy h1 {
+  margin: 18px 0 0;
+  font-size: clamp(40px, 8vw, 76px);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  color: #1c180f;
+}
+
+.hero-text {
+  max-width: 36rem;
+  margin: 20px 0 0;
+  font-size: 18px;
+  line-height: 1.7;
+  color: #5f5a52;
+}
+
+.hero-card {
+  padding: 28px;
+  align-self: end;
+}
+
+.hero-card-label {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a04b08;
+}
+
+.hero-card ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #433b31;
+  line-height: 1.8;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.module-card {
+  padding: 24px;
+}
+
+.module-priority {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff0e0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a14d0c;
+}
+
+.module-card h2 {
+  margin: 16px 0 8px;
+  font-size: 24px;
+  color: #1c180f;
+}
+
+.module-card p {
+  margin: 0;
+  line-height: 1.7;
+  color: #5f5a52;
+}
+
+@media (max-width: 920px) {
+  .hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .module-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .page-shell {
+    width: min(100% - 24px, 1120px);
+    padding-top: 24px;
+  }
+
+  .hero-copy,
+  .hero-card,
+  .module-card {
+    border-radius: 24px;
+  }
+
+  .hero-copy {
+    padding: 24px;
+  }
+
+  .hero-text {
+    font-size: 16px;
+  }
+
+  .module-grid {
+    grid-template-columns: 1fr;
+  }
+}
