@@ -133,7 +133,7 @@ export default function Diagnosing() {
 
   useEffect(() => {
     document.title = "诊断中... - 薯医 NoteRx";
-    if (!params) { navigate("/"); return; }
+    if (!params) { navigate("/app"); return; }
     let cancelled = false;
 
     // Phase 1: Instant pre-score

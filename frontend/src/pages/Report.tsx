@@ -66,7 +66,7 @@ export default function Report() {
       <Box sx={{ minHeight: "100vh", bgcolor: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Box sx={{ textAlign: "center" }}>
           <Typography sx={{ color: "#999", fontSize: 14, mb: 2 }}>暂无诊断数据</Typography>
-          <Button onClick={() => navigate("/")} sx={{ color: "#ff2442", fontWeight: 600 }}>返回首页</Button>
+          <Button onClick={() => navigate("/app")} sx={{ color: "#ff2442", fontWeight: 600 }}>返回首页</Button>
         </Box>
       </Box>
     );
@@ -89,7 +89,7 @@ export default function Report() {
         <Box sx={{ maxWidth: 960, mx: "auto", px: { xs: 2, md: 3 }, py: 1.25, display: "flex", alignItems: "center" }}>
           <Button
             startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/app")}
             sx={{ color: "#999", fontWeight: 500, fontSize: 13, "&:hover": { color: "#262626" } }}
           >
             首页

@@ -216,7 +216,7 @@ export default function ScreenshotAnalysis() {
             </Box>
           ))}
         </Stack>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/")} sx={{ mt: 4, color: "#999" }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/app")} sx={{ mt: 4, color: "#999" }}>
           返回首页
         </Button>
       </Box>
@@ -294,7 +294,7 @@ export default function ScreenshotAnalysis() {
                 </Box>
               )}
 
-              <Button variant="contained" fullWidth onClick={() => navigate("/")}
+              <Button variant="contained" fullWidth onClick={() => navigate("/app")}
                 sx={{ py: 1.4, fontSize: "0.95rem", fontWeight: 600, borderRadius: "12px", bgcolor: "#ff2442", "&:hover": { bgcolor: "#d91a36" } }}
               >
                 返回首页

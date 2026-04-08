@@ -198,22 +198,28 @@ export default function UploadZone({
                       )}
                       <IconButton
                         size="small"
+                        aria-label="删除文件"
                         onClick={() => removeFile(idx)}
                         sx={{
                           position: "absolute", top: 2, right: 2,
-                          bgcolor: "rgba(0,0,0,0.45)", color: "#fff",
-                          width: 20, height: 20,
-                          "&:hover": { bgcolor: "rgba(0,0,0,0.65)" },
+                          bgcolor: "rgba(0,0,0,0.5)", color: "#fff",
+                          width: 24, height: 24, minWidth: 24,
+                          padding: 0,
+                          "&:hover": { bgcolor: "rgba(0,0,0,0.7)" },
                         }}
                       >
-                        <CloseIcon sx={{ fontSize: 12 }} />
+                        <CloseIcon sx={{ fontSize: 14 }} />
                       </IconButton>
                     </Box>
                   );
                 })}
                 {files.length < maxFiles && (
                   <Box
+                    role="button"
+                    tabIndex={0}
+                    aria-label="添加更多文件"
                     onClick={() => inputRef.current?.click()}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
                     sx={{
                       aspectRatio: "1",
                       borderRadius: "8px",
@@ -225,6 +231,7 @@ export default function UploadZone({
                       cursor: "pointer",
                       transition: "all 0.15s",
                       "&:hover": { borderColor: "#ff2442", bgcolor: "#fff5f6" },
+                      "&:focus-visible": { outline: "2px solid #ff2442", outlineOffset: 2 },
                     }}
                   >
                     <AddPhotoAlternateIcon sx={{ fontSize: 24, color: "#ccc" }} />
@@ -265,7 +272,7 @@ export default function UploadZone({
       </Box>
 
       {error && (
-        <Typography sx={{ color: "#ef4444", mt: 0.75, fontSize: "0.8rem" }}>
+        <Typography role="alert" sx={{ color: "#ef4444", mt: 0.75, fontSize: "0.8rem" }}>
           {error}
         </Typography>
       )}

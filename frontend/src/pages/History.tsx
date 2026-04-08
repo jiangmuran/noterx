@@ -133,7 +133,7 @@ export default function History() {
         >
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/app")}
             size="small"
             sx={{ color: "#262626" }}
           >
@@ -175,7 +175,7 @@ export default function History() {
                   textTransform: "none",
                   "&:hover": { bgcolor: "#404040" },
                 }}
-                onClick={() => navigate("/")}
+                onClick={() => navigate("/app")}
               >
                 去诊断
               </Button>

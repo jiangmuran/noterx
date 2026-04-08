@@ -589,6 +589,8 @@
     .stat-pill .num { font-size: 0.9rem; margin-right: 0.15rem; }
     .data-table { display: block; overflow-x: auto; }
     .insight-card .value { font-size: 1.5rem; }
+    .floating-cta { bottom: 1rem !important; right: 1rem !important; }
+    .floating-cta-btn { font-size: 0.8rem !important; padding: 0.6rem 1.2rem !important; }
   }
 </style>
 </head>
@@ -605,6 +607,9 @@
     <p class="subtitle">
       4 名 13 岁中学生 · 874 条真实笔记 · 2500 条评论 · 双轨分析<br>
       用数据科学拆解小红书的内容密码
+    </p>
+    <p style="margin-top:1rem; font-size:1.1rem; font-weight:600; color:rgba(255,255,255,0.85); letter-spacing:0.05em;">
+      48小时 · 25000行代码 · 4名13岁中学生
     </p>
     <div class="stats-row">
       <div class="stat-pill"><span class="num counter" data-target="874">0</span>条笔记</div>
@@ -625,15 +630,15 @@
 <section>
   <div class="reveal">
     <div class="section-label">About</div>
-    <h2>NoteRx 是什么？</h2>
+    <h2>不是拍脑袋，是数据说了算</h2>
     <p>
-      <strong>NoteRx（薯医）</strong>是一个小红书笔记 AI 诊断平台。用户提交一条笔记（文字/截图/链接），
-      5 个 AI Agent 会像医生会诊一样，从<strong>内容质量、视觉表现、增长潜力、用户视角、综合评判</strong>
-      五个维度进行多轮辩论式诊断，最终给出量化评分和具体优化建议。
+      <strong>NoteRx（薯医）</strong>不是又一个"AI帮你写文案"的玩具。它是一套<strong>5个AI Agent多轮辩论</strong>的诊断系统——
+      内容质量、视觉表现、增长潜力、用户视角、综合评判，五个维度像专家会诊一样针锋相对，
+      最终输出量化评分和可执行的优化方案。
     </p>
     <p>
-      但我们不想让 AI "拍脑袋"——所以我们做了这项研究，用 <strong>874 条真实数据</strong> 训练出品类差异化的评分模型，
-      让每一条诊断建议都有数据支撑。
+      每一条诊断建议背后，都有 <strong>874 条真实小红书笔记</strong>的数据支撑。
+      我们用统计学方法建立了品类差异化的评分基线——不猜，不编，用数据说话。
     </p>
   </div>
 
@@ -699,7 +704,7 @@
 <section>
   <div class="reveal">
     <div class="section-label" id="findings">Key Findings</div>
-    <h2>那些反直觉的发现</h2>
+    <h2>我们发现了这些秘密</h2>
   </div>
 
   <div class="insights-grid">
@@ -1219,8 +1224,8 @@
 </section>
 
 <!-- Floating CTA -->
-<div style="position:fixed;bottom:2rem;right:2rem;z-index:999;">
-  <a href="/app" onclick="return launchApp(event)" class="cta-btn primary" style="box-shadow:0 8px 30px rgba(0,0,0,0.3);font-size:0.95rem;">
+<div class="floating-cta" style="position:fixed;bottom:2rem;right:2rem;z-index:999;">
+  <a href="/app" onclick="return launchApp(event)" class="cta-btn primary floating-cta-btn" style="box-shadow:0 8px 30px rgba(0,0,0,0.3);font-size:0.95rem;">
     🩺 立即诊断
   </a>
 </div>
@@ -1231,6 +1236,9 @@
   </div>
   <div class="team">Team PageOne</div>
   <p>姜睦然 · 杨星泽 · 王翔远 · 庞然</p>
+  <p style="margin-top:0.8rem; font-size:0.95rem; color:rgba(255,255,255,0.7); font-weight:500;">
+    用 48 小时证明：13 岁也能做出专业级 AI 产品
+  </p>
   <p style="margin-top:0.5rem; font-size:0.8rem; opacity: 0.5;">
     AGI x³ 黑客松 · 2026.04.07—10 · 874 notes · 2500 comments · Built with data
   </p>

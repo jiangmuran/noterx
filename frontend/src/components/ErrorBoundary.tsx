@@ -51,7 +51,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             </Typography>
             <Button
               variant="contained"
-              onClick={() => window.location.assign("/")}
+              onClick={() => window.location.assign("/app")}
             >
               返回首页
             </Button>
