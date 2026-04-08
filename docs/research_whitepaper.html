@@ -103,18 +103,18 @@ footer .team{font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.3rem}
 footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
 
 
-/* ━━ Sticky CTA (appears after scrolling past hero) ━━ */
-.sticky-cta{position:fixed;bottom:1.5rem;left:50%;z-index:998;transform:translateX(-50%) translateY(80px);opacity:0;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s;pointer-events:none}
-.sticky-cta.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:all}
-.sticky-cta .btn-red{box-shadow:0 6px 28px rgba(255,36,66,0.4);padding:0.7rem 2rem;font-size:0.9rem}
+/* ━━ Sticky CTA (right-bottom, appears after hero) ━━ */
+.sticky-cta{position:fixed;bottom:1.5rem;right:1.5rem;z-index:998;transform:translateY(80px) scale(0.8);opacity:0;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1),opacity 0.3s;pointer-events:none}
+.sticky-cta.show{transform:translateY(0) scale(1);opacity:1;pointer-events:all}
+.sticky-cta .btn-red{box-shadow:0 6px 28px rgba(255,36,66,0.45);padding:0.7rem 1.8rem;font-size:0.9rem;border-radius:50px}
 
-/* ━━ Launch overlay (red fullscreen) ━━ */
-#launch-overlay{position:fixed;inset:0;z-index:99999;pointer-events:none;background:var(--red);opacity:0;transition:opacity 0.3s ease;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.6rem}
-#launch-overlay.go{opacity:1;pointer-events:all}
-#launch-overlay .lo-name{font-size:1.6rem;font-weight:900;color:#fff;opacity:0;transform:translateY(8px);transition:opacity 0.3s 0.15s,transform 0.3s 0.15s}
-#launch-overlay.go .lo-name{opacity:1;transform:none}
-#launch-overlay .lo-spin{width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp 0.7s linear infinite;opacity:0;transition:opacity 0.2s 0.25s}
-#launch-overlay.go .lo-spin{opacity:1}
+/* ━━ Launch overlay (red circle expand from button) ━━ */
+#launch-overlay{position:fixed;inset:0;z-index:99999;pointer-events:none;overflow:hidden}
+#launch-overlay .lo-circle{position:absolute;width:60px;height:60px;border-radius:50%;background:var(--red);transform:translate(-50%,-50%) scale(0);will-change:transform}
+#launch-overlay .lo-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;opacity:0;transition:opacity 0.25s 0.3s}
+#launch-overlay.go .lo-center{opacity:1}
+#launch-overlay .lo-name{font-size:1.5rem;font-weight:900;color:#fff}
+#launch-overlay .lo-spin{width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp 0.7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
 /* ━━ Scroll reveal ━━ */
@@ -512,18 +512,42 @@ footer .motto{color:rgba(255,255,255,0.6);font-size:0.9rem;margin:0.8rem 0}
   <a href="/app" onclick="return go(event)" class="btn btn-red">立即诊断</a>
 </div>
 
-<!-- ━━ LAUNCH OVERLAY (red fullscreen) ━━ -->
+<!-- ━━ LAUNCH OVERLAY (red circle expand) ━━ -->
 <div id="launch-overlay">
-  <div class="lo-name">薯医 NoteRx</div>
-  <div class="lo-spin"></div>
+  <div class="lo-circle"></div>
+  <div class="lo-center">
+    <div class="lo-name">薯医 NoteRx</div>
+    <div class="lo-spin"></div>
+  </div>
 </div>
 
 <script>
 // Launch transition
 function go(e){
   e.preventDefault();
-  document.getElementById('launch-overlay').classList.add('go');
-  setTimeout(function(){window.location.href='/app'},800);
+  var o=document.getElementById('launch-overlay');
+  var c=o.querySelector('.lo-circle');
+  var r=e.currentTarget.getBoundingClientRect();
+  var cx=r.left+r.width/2, cy=r.top+r.height/2;
+  // position circle at button center
+  c.style.left=cx+'px';
+  c.style.top=cy+'px';
+  // calculate scale to cover entire viewport from this point
+  var maxDist=Math.max(
+    Math.hypot(cx,cy),
+    Math.hypot(window.innerWidth-cx,cy),
+    Math.hypot(cx,window.innerHeight-cy),
+    Math.hypot(window.innerWidth-cx,window.innerHeight-cy)
+  );
+  var scale=maxDist*2.5/30; // 30 = radius of 60px circle
+  // animate
+  c.style.transition='none';
+  c.style.transform='translate(-50%,-50%) scale(0)';
+  void c.offsetWidth; // force reflow
+  c.style.transition='transform 0.5s cubic-bezier(0.4,0,0,1)';
+  c.style.transform='translate(-50%,-50%) scale('+scale+')';
+  o.classList.add('go');
+  setTimeout(function(){window.location.href='/app'},900);
   return false;
 }
 
