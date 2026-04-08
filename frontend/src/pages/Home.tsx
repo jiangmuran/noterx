@@ -45,6 +45,8 @@ export default function Home() {
   const [aiRecogs, setAiRecogs] = useState<Record<string, QuickRecognizeResult>>({});
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [aiSuggestion, setAiSuggestion] = useState("");
+  const [uploadingPulse, setUploadingPulse] = useState(false);
+  const [analyzingPulse, setAnalyzingPulse] = useState(false);
 
   const [userEdited, setUserEdited] = useState({ title: false, content: false, category: false });
 
@@ -52,8 +54,49 @@ export default function Home() {
   const [wizardStep, setWizardStep] = useState(0);
   const [wizardHold, setWizardHold] = useState(false);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uploadPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const analyzePulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recognizeInFlightRef = useRef<Set<string>>(new Set());
+  const prevPendingRecognitionRef = useRef(false);
 
   useEffect(() => { document.title = "薯医 NoteRx"; }, []);
+
+  useEffect(() => {
+    return () => {
+      if (uploadPulseTimerRef.current) clearTimeout(uploadPulseTimerRef.current);
+      if (analyzePulseTimerRef.current) clearTimeout(analyzePulseTimerRef.current);
+      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+    };
+  }, []);
+
+  const triggerUploadPulse = useCallback(() => {
+    if (uploadPulseTimerRef.current) clearTimeout(uploadPulseTimerRef.current);
+    setUploadingPulse(true);
+    uploadPulseTimerRef.current = setTimeout(() => {
+      setUploadingPulse(false);
+      uploadPulseTimerRef.current = null;
+    }, 500);
+  }, []);
+
+  const handleFilesChange = useCallback(
+    (newFiles: File[]) => {
+      setFiles(newFiles);
+      if (newFiles.length > 0) triggerUploadPulse();
+    },
+    [triggerUploadPulse],
+  );
+
+  const appendFiles = useCallback(
+    (incoming: File[]) => {
+      if (incoming.length === 0) return;
+      setFiles((prev) => {
+        const next = [...prev, ...incoming].slice(0, 9);
+        if (next.length !== prev.length) triggerUploadPulse();
+        return next;
+      });
+    },
+    [triggerUploadPulse],
+  );
 
   /** Ctrl+V paste images */
   useEffect(() => {
@@ -67,11 +110,11 @@ export default function Home() {
           if (file) pasted.push(file);
         }
       }
-      if (pasted.length > 0) setFiles((prev) => [...prev, ...pasted].slice(0, 9));
+      appendFiles(pasted);
     };
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, []);
+  }, [appendFiles]);
 
   const anyLoading = useMemo(() => Object.values(aiLoading).some(Boolean), [aiLoading]);
   const allResults = useMemo(() => Object.values(aiRecogs), [aiRecogs]);
@@ -97,6 +140,14 @@ export default function Home() {
     () => new Set(files.filter((f) => f.type.startsWith("image/")).map(fkey)),
     [files],
   );
+
+  const pendingRecognition = useMemo(() => {
+    if (imageFileKeys.size === 0) return false;
+    for (const key of imageFileKeys) {
+      if (aiLoading[key] || !aiRecogs[key]) return true;
+    }
+    return false;
+  }, [imageFileKeys, aiLoading, aiRecogs]);
 
   const allRecognitionDone = useMemo(() => {
     if (imageFileKeys.size === 0) return false;
@@ -147,6 +198,8 @@ export default function Home() {
 
   const runRecognition = useCallback(async (file: File) => {
     const key = fkey(file);
+    if (recognizeInFlightRef.current.has(key)) return;
+    recognizeInFlightRef.current.add(key);
     setAiLoading((p) => {
       if (p[key]) return p;
       return { ...p, [key]: true };
@@ -157,9 +210,62 @@ export default function Home() {
     } catch {
       setAiRecogs((p) => ({ ...p, [key]: { success: false, slot_type: "unknown", category: "", summary: "", error: "识别失败" } }));
     } finally {
+      recognizeInFlightRef.current.delete(key);
       setAiLoading((p) => ({ ...p, [key]: false }));
     }
   }, []);
+
+  useEffect(() => {
+    const validKeys = new Set(files.map(fkey));
+    setAiRecogs((prev) => {
+      let changed = false;
+      const next: Record<string, QuickRecognizeResult> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        if (validKeys.has(key)) next[key] = value;
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+    setAiLoading((prev) => {
+      let changed = false;
+      const next: Record<string, boolean> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        if (validKeys.has(key)) next[key] = value;
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+    recognizeInFlightRef.current.forEach((key) => {
+      if (!validKeys.has(key)) recognizeInFlightRef.current.delete(key);
+    });
+  }, [files]);
+
+  useEffect(() => {
+    files.forEach((file) => {
+      if (!file.type.startsWith("image/")) return;
+      const key = fkey(file);
+      if (!aiRecogs[key] && !aiLoading[key]) {
+        void runRecognition(file);
+      }
+    });
+  }, [files, aiRecogs, aiLoading, runRecognition]);
+
+  useEffect(() => {
+    if (!prevPendingRecognitionRef.current && pendingRecognition && analyzePulseTimerRef.current) {
+      clearTimeout(analyzePulseTimerRef.current);
+      analyzePulseTimerRef.current = null;
+      setAnalyzingPulse(false);
+    }
+    if (prevPendingRecognitionRef.current && !pendingRecognition && imageFileKeys.size > 0) {
+      if (analyzePulseTimerRef.current) clearTimeout(analyzePulseTimerRef.current);
+      setAnalyzingPulse(true);
+      analyzePulseTimerRef.current = setTimeout(() => {
+        setAnalyzingPulse(false);
+        analyzePulseTimerRef.current = null;
+      }, 700);
+    }
+    prevPendingRecognitionRef.current = pendingRecognition;
+  }, [pendingRecognition, imageFileKeys.size]);
 
   useEffect(() => {
     const imgCount = files.filter((f) => f.type.startsWith("image/")).length;
@@ -176,12 +282,23 @@ export default function Home() {
     if (files.length === 0) {
       setAiRecogs({});
       setAiLoading({});
+      recognizeInFlightRef.current.clear();
       setUserEdited({ title: false, content: false, category: false });
       setTitle("");
       setContent("");
       setCategory("food");
       setWizardStep(0);
       setWizardHold(false);
+      setUploadingPulse(false);
+      setAnalyzingPulse(false);
+      if (uploadPulseTimerRef.current) {
+        clearTimeout(uploadPulseTimerRef.current);
+        uploadPulseTimerRef.current = null;
+      }
+      if (analyzePulseTimerRef.current) {
+        clearTimeout(analyzePulseTimerRef.current);
+        analyzePulseTimerRef.current = null;
+      }
     }
   }, [files.length]);
 
@@ -205,20 +322,26 @@ export default function Home() {
     };
   }, [files.length, wizardHold, wizardStep, isDesktop]);
 
-  const handleFilesChange = useCallback(
-    (newFiles: File[]) => {
-      setFiles(newFiles);
-      for (const f of newFiles) {
-        const key = fkey(f);
-        if (f.type.startsWith("image/") && !aiRecogs[key]) {
-          runRecognition(f);
-        }
-      }
-    },
-    [runRecognition, aiRecogs],
-  );
+  const processingStatus = useMemo(() => {
+    if (files.length === 0) return null;
+    if (uploadingPulse) {
+      return { label: "上传中", tone: "info" as const, text: "素材已接收，正在准备识别..." };
+    }
+    if (pendingRecognition) {
+      return { label: "识别中", tone: "info" as const, text: "AI 正在识别标题、正文和分类..." };
+    }
+    if (analyzingPulse) {
+      return { label: "分析中", tone: "info" as const, text: "正在汇总识别结果并回填表单..." };
+    }
+    if (allRecognitionDone) {
+      return { label: "已就绪", tone: "success" as const, text: "识别完成，可继续发起诊断。" };
+    }
+    return null;
+  }, [files.length, uploadingPulse, pendingRecognition, analyzingPulse, allRecognitionDone]);
 
-  const canSubmit = files.length > 0 && title.trim().length > 0;
+  const lockInputs = !!processingStatus && processingStatus.label !== "已就绪";
+
+  const canSubmit = files.length > 0 && title.trim().length > 0 && !lockInputs;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -298,7 +421,7 @@ export default function Home() {
   );
 
   const aiPanel = (
-    (anyLoading || successResults.length > 0 || allFailed || aiSuggestion) && (
+    (processingStatus || anyLoading || successResults.length > 0 || allFailed || aiSuggestion) && (
       <Box
         sx={{
           p: { xs: 2, md: 1.35 },
@@ -310,6 +433,17 @@ export default function Home() {
           backdropFilter: "blur(8px)",
         }}
       >
+        {processingStatus && (
+          <Alert
+            severity={processingStatus.tone}
+            sx={{ mb: anyLoading || successResults.length > 0 || allFailed || aiSuggestion ? 1 : 0, py: 0 }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+              <Typography sx={{ fontSize: { xs: 12, md: 11 }, fontWeight: 700 }}>{processingStatus.label}</Typography>
+              <Typography sx={{ fontSize: { xs: 12, md: 11 }, color: "text.secondary" }}>{processingStatus.text}</Typography>
+            </Box>
+          </Alert>
+        )}
         {anyLoading && (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: successResults.length > 0 ? 1 : 0 }}>
             <CircularProgress size={14} thickness={5} sx={{ color: "#ff2442" }} />
@@ -365,11 +499,12 @@ export default function Home() {
           required
           fullWidth
           size={isDesktop ? "small" : "medium"}
+          disabled={lockInputs}
           value={title}
           onChange={(e) => { setTitle(e.target.value); setUserEdited((p) => ({ ...p, title: true })); }}
           placeholder="上传图片后 AI 自动识别，也可手动输入"
           slotProps={{ htmlInput: { maxLength: 100 } }}
-          helperText={autoFilled.title ? "✅ AI 已自动识别填充，可自行修改" : `${title.length}/100`}
+          helperText={lockInputs ? "AI 处理中，识别完成后会自动回填标题" : autoFilled.title ? "✅ AI 已自动识别填充，可自行修改" : `${title.length}/100`}
         />
         {showWarnings && warnings.title && !title.trim() && !userEdited.title && (
           <Alert severity="warning" icon={<WarningAmberIcon fontSize="small" />} sx={{ mt: 0.5, py: 0, fontSize: 11 }}>
@@ -384,10 +519,11 @@ export default function Home() {
           multiline
           rows={isDesktop ? 3 : 4}
           size={isDesktop ? "small" : "medium"}
+          disabled={lockInputs}
           value={content}
           onChange={(e) => { setContent(e.target.value); setUserEdited((p) => ({ ...p, content: true })); }}
           placeholder="上传图片后 AI 自动提取正文，也可手动输入"
-          helperText={autoFilled.content ? "✅ AI 已自动提取正文，可自行修改" : undefined}
+          helperText={lockInputs ? "AI 处理中，识别完成后会自动回填正文" : autoFilled.content ? "✅ AI 已自动提取正文，可自行修改" : undefined}
         />
         {showWarnings && warnings.content && !content.trim() && !userEdited.content && (
           <Alert severity="warning" icon={<WarningAmberIcon fontSize="small" />} sx={{ mt: 0.5, py: 0, fontSize: 11 }}>
