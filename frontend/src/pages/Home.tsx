@@ -537,6 +537,11 @@ export default function Home() {
       <Typography sx={{ mt: 0.8, fontSize: { xs: 11, md: 10 }, color: "#6b7280", lineHeight: 1.5 }}>
         当前阶段：{guideSteps[GUIDE_STAGE_ORDER.indexOf(activeUploadStage)]}。上传的素材只会归属这个阶段。
       </Typography>
+      {activeUploadStage !== "details" && (
+        <Typography sx={{ mt: 0.35, fontSize: { xs: 11, md: 10 }, color: "#b45309", lineHeight: 1.5, fontWeight: 600 }}>
+          提示：标题/正文只会从「3. 上传笔记详情」阶段的截图中提取。
+        </Typography>
+      )}
     </Box>
   );
 
