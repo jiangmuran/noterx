@@ -181,7 +181,7 @@ def main():
 
     cursor.execute("DELETE FROM baseline_stats")
 
-    for cat in ["food", "fashion", "tech"]:
+    for cat in ["food", "fashion", "tech", "travel", "beauty", "fitness", "lifestyle", "home"]:
         compute_for_category(cursor, cat)
 
     conn.commit()

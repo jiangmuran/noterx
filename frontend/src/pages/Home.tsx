@@ -25,6 +25,8 @@ const SAMPLES = [
   { title: "5步搞定！零失败的懒人蛋炒饭", content: "今天教大家做超简单的蛋炒饭，只需要鸡蛋、隔夜饭和葱花。", tags: "美食分享,蛋炒饭,快手菜", category: "food" },
   { title: "这件外套也太好看了吧", content: "今年秋冬必入的一件外套！面料超舒服，版型也很好。", tags: "穿搭,秋冬穿搭,外套推荐", category: "fashion" },
   { title: "用了3个月的平板终于来测评了", content: "作为一个重度用户，这款平板的使用体验如何？今天给大家详细聊聊。", tags: "科技,平板测评,数码好物", category: "tech" },
+  { title: "三亚5天4晚人均3000攻略", content: "吃住行全包的高性价比玩法，第一次去三亚的姐妹看过来。", tags: "旅行攻略,三亚,省钱攻略", category: "travel" },
+  { title: "小户型收纳术｜40㎡住出幸福感", content: "分享我家的收纳改造过程，每个角落都不浪费。", tags: "家居,收纳,小户型", category: "home" },
 ];
 
 interface HistoryItem {
@@ -42,7 +44,7 @@ const GRADE_COLOR: Record<string, string> = {
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
-  food: "美食", fashion: "穿搭", tech: "科技", travel: "旅行", beauty: "美妆", fitness: "健身", lifestyle: "生活",
+  food: "美食", fashion: "穿搭", tech: "科技", travel: "旅行", beauty: "美妆", fitness: "健身", lifestyle: "生活", home: "家居",
 };
 
 export default function Home() {
