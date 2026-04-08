@@ -247,9 +247,29 @@ export default function Home() {
   };
 
   const guideCard = (
-    <Box sx={{ p: { xs: 1.5, md: 1.25 }, borderRadius: "12px", bgcolor: "#fff5f6", border: "1px solid #ffe3e8", flexShrink: 0 }}>
-      <Typography sx={{ fontSize: { xs: 12, md: 11 }, color: "#ff2442", fontWeight: 600, mb: { xs: 1, md: 0.75 } }}>
-        引导：按截图类型补齐素材，识别更准确
+    <Box
+      sx={{
+        p: { xs: 1.75, md: 1.35 },
+        borderRadius: "14px",
+        flexShrink: 0,
+        background: "linear-gradient(145deg, rgba(255, 245, 247, 0.95) 0%, rgba(255, 250, 251, 0.98) 100%)",
+        border: "1px solid rgba(255, 36, 66, 0.12)",
+        boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.85)",
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: { xs: 12, md: 11 },
+          background: "linear-gradient(90deg, #ff2442, #ff6b81)",
+          backgroundClip: "text",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          fontWeight: 700,
+          letterSpacing: "0.02em",
+          mb: { xs: 1, md: 0.85 },
+        }}
+      >
+        引导 · 按截图类型补齐素材，识别更准确
       </Typography>
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
         {guideSteps.map((step, idx) => (
@@ -258,28 +278,41 @@ export default function Home() {
             size="small"
             label={step}
             sx={{
-              bgcolor: idx <= currentGuideIndex ? "#ff2442" : "#fff",
-              color: idx <= currentGuideIndex ? "#fff" : "#999",
-              border: idx <= currentGuideIndex ? "none" : "1px solid #eee",
+              background: idx <= currentGuideIndex ? "linear-gradient(135deg, #ff3d5c, #e61e3d)" : "rgba(255,255,255,0.92)",
+              color: idx <= currentGuideIndex ? "#fff" : "#6b6b6b",
+              border: idx <= currentGuideIndex ? "none" : "1px solid rgba(0,0,0,0.06)",
               fontSize: { xs: 11, md: 10 },
-              height: { md: 22 },
+              height: { md: 24 },
               fontWeight: idx === currentGuideIndex ? 700 : 500,
+              boxShadow: idx <= currentGuideIndex ? "0 2px 8px rgba(255, 36, 66, 0.25)" : "0 1px 2px rgba(0,0,0,0.04)",
+              transition: "all 0.2s ease",
             }}
           />
         ))}
       </Box>
-      <Typography sx={{ mt: { xs: 1, md: 0.75 }, fontSize: { xs: 12, md: 11 }, color: "#666" }}>
-        当前建议：{guideSteps[currentGuideIndex]}
+      <Typography sx={{ mt: { xs: 1, md: 0.85 }, fontSize: { xs: 12, md: 11 }, color: "#5c5c5c", lineHeight: 1.55 }}>
+        <Box component="span" sx={{ color: "#ff2442", fontWeight: 600 }}>当前建议</Box>
+        ：{guideSteps[currentGuideIndex]}
       </Typography>
     </Box>
   );
 
   const aiPanel = (
     (anyLoading || successResults.length > 0 || allFailed || aiSuggestion) && (
-      <Box sx={{ p: { xs: 2, md: 1.25 }, borderRadius: "12px", bgcolor: allFailed ? "#fffbeb" : "#fafbfc", border: `1px solid ${allFailed ? "#fde68a" : "#f0f0f0"}`, flexShrink: 0 }}>
+      <Box
+        sx={{
+          p: { xs: 2, md: 1.35 },
+          borderRadius: "14px",
+          flexShrink: 0,
+          bgcolor: allFailed ? "rgba(254, 243, 199, 0.35)" : "rgba(248, 250, 252, 0.9)",
+          border: allFailed ? "1px solid rgba(245, 158, 11, 0.28)" : "1px solid rgba(0, 0, 0, 0.05)",
+          boxShadow: allFailed ? "inset 0 1px 0 rgba(255,255,255,0.6)" : "inset 0 1px 0 rgba(255,255,255,0.8)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
         {anyLoading && (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: successResults.length > 0 ? 1 : 0 }}>
-            <CircularProgress size={14} sx={{ color: "#ff2442" }} />
+            <CircularProgress size={14} thickness={5} sx={{ color: "#ff2442" }} />
             <Typography sx={{ fontSize: { xs: 12, md: 11 }, color: "#999" }}>AI 正在识别标题、正文、垂类...</Typography>
           </Box>
         )}
@@ -302,14 +335,22 @@ export default function Home() {
                 icon={<CheckCircleIcon sx={{ fontSize: 14 }} />}
                 label={r.category ? `${r.category}${r.summary ? ` · ${r.summary.slice(0, 20)}` : ""}` : r.summary?.slice(0, 30)}
                 size="small"
-                sx={{ bgcolor: "#f0fdf4", color: "#16a34a", fontWeight: 500, fontSize: 11, "& .MuiChip-icon": { color: "#16a34a" } }}
+                sx={{
+                  bgcolor: "rgba(16, 185, 129, 0.1)",
+                  color: "#047857",
+                  fontWeight: 600,
+                  fontSize: 11,
+                  border: "1px solid rgba(16, 185, 129, 0.2)",
+                  "& .MuiChip-icon": { color: "#059669" },
+                }}
               />
             ))}
           </Box>
         )}
         {aiSuggestion && !allFailed && (
-          <Typography sx={{ fontSize: { xs: 12, md: 11 }, color: "#666", lineHeight: 1.5 }}>
-            💡 {aiSuggestion}
+          <Typography sx={{ fontSize: { xs: 12, md: 11 }, color: "#4b5563", lineHeight: 1.55 }}>
+            <Box component="span" sx={{ mr: 0.5 }} aria-hidden>✨</Box>
+            {aiSuggestion}
           </Typography>
         )}
       </Box>
@@ -358,7 +399,18 @@ export default function Home() {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: { xs: 1, md: 0.75 } }}>
           <Typography sx={{ fontSize: { xs: 13, md: 12 }, color: "#999", fontWeight: 500 }}>选择垂类</Typography>
           {autoFilled.category && (
-            <Chip label="AI 已识别" size="small" sx={{ bgcolor: "#f0fdf4", color: "#16a34a", fontSize: 10, height: 20 }} />
+            <Chip
+              label="AI 已识别"
+              size="small"
+              sx={{
+                fontSize: 10,
+                height: 22,
+                fontWeight: 600,
+                bgcolor: "rgba(16, 185, 129, 0.12)",
+                color: "#047857",
+                border: "1px solid rgba(16, 185, 129, 0.22)",
+              }}
+            />
           )}
         </Box>
         <CategoryPicker value={category} onChange={(v) => { setCategory(v); setUserEdited((p) => ({ ...p, category: true })); }} />
@@ -381,11 +433,8 @@ export default function Home() {
         py: { xs: 1.4, md: 1.1 },
         fontSize: { xs: "0.95rem", md: "0.9rem" },
         fontWeight: 600,
-        borderRadius: "12px",
+        borderRadius: "14px",
         minHeight: { xs: 48, md: 44 },
-        bgcolor: "#ff2442",
-        "&:hover": { bgcolor: "#d91a36" },
-        "&.Mui-disabled": { bgcolor: "#f0f0f0", color: "#bbb" },
         flexShrink: 0,
       }}
     >
@@ -394,7 +443,21 @@ export default function Home() {
   );
 
   const stepHeader = (
-    <Stepper activeStep={isDesktop ? 1 : wizardStep} alternativeLabel sx={{ mb: { xs: 2, md: 1.5 }, "& .MuiStepLabel-label": { fontSize: { md: 12 } } }}>
+    <Stepper
+      activeStep={isDesktop ? 1 : wizardStep}
+      alternativeLabel
+      sx={{
+        mb: { xs: 2, md: 1.5 },
+        px: { xs: 0, md: 0.5 },
+        "& .MuiStepLabel-label": {
+          fontSize: { xs: 12, md: 12 },
+          fontWeight: 500,
+          color: "text.secondary",
+          "&.Mui-active": { color: "primary.main", fontWeight: 700 },
+          "&.Mui-completed": { color: "success.main", fontWeight: 600 },
+        },
+      }}
+    >
       {WIZARD_LABELS.map((label) => (
         <Step key={label}>
           <StepLabel>{label}</StepLabel>
@@ -411,26 +474,69 @@ export default function Home() {
         maxHeight: "100dvh",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "#f3f4f6",
+        background: "linear-gradient(168deg, #f0eef2 0%, #e8eaef 38%, #f7f5f7 100%)",
         overflow: "hidden",
       }}
     >
-      <Box sx={{ flexShrink: 0, px: 2, pt: 1.5, pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+      <Box
+        sx={{
+          flexShrink: 0,
+          px: 2,
+          pt: 1.5,
+          pb: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 2,
+          borderBottom: "1px solid rgba(0,0,0,0.04)",
+          background: "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, transparent 100%)",
+          backdropFilter: "blur(10px)",
+        }}
+      >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
-          <svg width="26" height="26" viewBox="0 0 28 28" fill="none" style={{ flexShrink: 0 }}>
-            <rect width="28" height="28" rx="7" fill="#ff2442" />
+          <svg width="26" height="26" viewBox="0 0 28 28" fill="none" style={{ flexShrink: 0 }} aria-hidden>
+            <defs>
+              <linearGradient id="homeLogoDesk" x1="4" y1="4" x2="26" y2="24" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#ff5c6f" />
+                <stop offset="1" stopColor="#e61e3d" />
+              </linearGradient>
+            </defs>
+            <rect width="28" height="28" rx="7" fill="url(#homeLogoDesk)" />
             <text x="14" y="19" textAnchor="middle" fill="#fff" fontSize="13" fontWeight="700" fontFamily="Inter, system-ui, sans-serif">Rx</text>
           </svg>
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: "1.05rem", fontWeight: 700, color: "#262626", lineHeight: 1.2 }}>薯医 NoteRx</Typography>
-            <Typography sx={{ fontSize: "0.72rem", color: "#888", lineHeight: 1.2 }}>上传素材 → AI 预填 → 一键诊断</Typography>
+            <Typography
+              sx={{
+                fontSize: "1.05rem",
+                fontWeight: 800,
+                lineHeight: 1.2,
+                letterSpacing: "-0.02em",
+                background: "linear-gradient(90deg, #1a1a1a 0%, #404040 100%)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              薯医 NoteRx
+            </Typography>
+            <Typography sx={{ fontSize: "0.72rem", color: "text.secondary", lineHeight: 1.35, opacity: 0.92 }}>
+              上传素材 → AI 预填 → 一键诊断
+            </Typography>
           </Box>
         </Box>
         <Button
           startIcon={<HistoryOutlined sx={{ fontSize: 16 }} />}
           onClick={() => navigate("/history")}
           size="small"
-          sx={{ color: "#666", fontSize: 12, fontWeight: 500, flexShrink: 0, "&:hover": { color: "#262626" } }}
+          sx={{
+            color: "text.secondary",
+            fontSize: 12,
+            fontWeight: 600,
+            flexShrink: 0,
+            borderRadius: "10px",
+            px: 1.25,
+            "&:hover": { color: "text.primary", bgcolor: "rgba(255,36,66,0.06)" },
+          }}
         >
           历史记录
         </Button>
@@ -460,15 +566,16 @@ export default function Home() {
           <Paper
             elevation={0}
             sx={{
-              borderRadius: "16px",
-              border: "1px solid #e8e8e8",
+              borderRadius: "18px",
+              border: "1px solid rgba(255,255,255,0.85)",
               p: 2,
               display: "flex",
               flexDirection: "column",
               gap: 1.5,
               minHeight: 0,
-              bgcolor: "#fff",
-              boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+              bgcolor: "rgba(255,255,255,0.78)",
+              backdropFilter: "blur(14px)",
+              boxShadow: "0 10px 40px rgba(25, 20, 35, 0.07), 0 1px 0 rgba(255,255,255,0.95) inset",
             }}
           >
             {stepHeader}
@@ -481,17 +588,31 @@ export default function Home() {
           <Paper
             elevation={0}
             sx={{
-              borderRadius: "16px",
-              border: "1px solid #e8e8e8",
+              borderRadius: "18px",
+              border: "1px solid rgba(255,255,255,0.85)",
               p: 2,
               display: "flex",
               flexDirection: "column",
               minHeight: 0,
-              bgcolor: "#fff",
-              boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+              bgcolor: "rgba(255,255,255,0.78)",
+              backdropFilter: "blur(14px)",
+              boxShadow: "0 10px 40px rgba(25, 20, 35, 0.07), 0 1px 0 rgba(255,255,255,0.95) inset",
             }}
           >
-            <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#262626", mb: 1, flexShrink: 0 }}>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 700,
+                mb: 1,
+                flexShrink: 0,
+                letterSpacing: "0.02em",
+                color: "text.primary",
+                borderLeft: "3px solid",
+                borderColor: "primary.main",
+                pl: 1,
+                py: 0.25,
+              }}
+            >
               笔记信息
             </Typography>
             <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", pr: 0.5, display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -503,7 +624,7 @@ export default function Home() {
         </Box>
       </Box>
 
-      <Typography sx={{ flexShrink: 0, textAlign: "center", pb: 1, fontSize: "0.65rem", color: "#ccc" }}>
+      <Typography sx={{ flexShrink: 0, textAlign: "center", pb: 1, fontSize: "0.65rem", color: "text.disabled", letterSpacing: "0.04em" }}>
         薯医 NoteRx · AI 诊断仅供参考
       </Typography>
     </Box>
@@ -516,13 +637,28 @@ export default function Home() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.35 }}
-      sx={{ minHeight: "100dvh", bgcolor: "#fafafa", display: "flex", flexDirection: "column", alignItems: "center", px: 2, py: 3, pb: 4 }}
+      sx={{
+        minHeight: "100dvh",
+        background: "linear-gradient(180deg, #faf8fa 0%, #f3f1f5 55%, #faf9fb 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        px: 2,
+        py: 3,
+        pb: 4,
+      }}
     >
       <Box sx={{ width: "100%", maxWidth: 520, display: "flex", justifyContent: "flex-end", mb: 1 }}>
         <Button
           startIcon={<HistoryOutlined sx={{ fontSize: 16 }} />}
           onClick={() => navigate("/history")}
-          sx={{ color: "#999", fontSize: 13, fontWeight: 500, "&:hover": { color: "#262626" } }}
+          sx={{
+            color: "text.secondary",
+            fontSize: 13,
+            fontWeight: 600,
+            borderRadius: "10px",
+            "&:hover": { color: "text.primary", bgcolor: "rgba(255,36,66,0.06)" },
+          }}
         >
           历史记录
         </Button>
@@ -530,13 +666,31 @@ export default function Home() {
 
       <Box sx={{ textAlign: "center", mb: 2 }}>
         <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <rect width="28" height="28" rx="7" fill="#ff2442" />
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden>
+            <defs>
+              <linearGradient id="homeLogoMob" x1="4" y1="4" x2="26" y2="24" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#ff5c6f" />
+                <stop offset="1" stopColor="#e61e3d" />
+              </linearGradient>
+            </defs>
+            <rect width="28" height="28" rx="7" fill="url(#homeLogoMob)" />
             <text x="14" y="19" textAnchor="middle" fill="#fff" fontSize="13" fontWeight="700" fontFamily="Inter, system-ui, sans-serif">Rx</text>
           </svg>
-          <Typography sx={{ fontSize: "1.35rem", fontWeight: 700, color: "#262626" }}>薯医 NoteRx</Typography>
+          <Typography
+            sx={{
+              fontSize: "1.35rem",
+              fontWeight: 800,
+              letterSpacing: "-0.02em",
+              background: "linear-gradient(90deg, #1a1a1a, #3d3d3d)",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            薯医 NoteRx
+          </Typography>
         </Box>
-        <Typography sx={{ fontSize: "0.82rem", color: "#999" }}>分步完成，上传后会自动进入下一步</Typography>
+        <Typography sx={{ fontSize: "0.82rem", color: "text.secondary", lineHeight: 1.5 }}>分步完成，上传后会自动进入下一步</Typography>
       </Box>
 
       <Paper
@@ -545,9 +699,11 @@ export default function Home() {
           width: "100%",
           maxWidth: 520,
           p: 2.5,
-          borderRadius: "16px",
-          border: "1px solid #f0f0f0",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
+          borderRadius: "20px",
+          border: "1px solid rgba(255,255,255,0.9)",
+          bgcolor: "rgba(255,255,255,0.82)",
+          backdropFilter: "blur(16px)",
+          boxShadow: "0 12px 48px rgba(25, 20, 35, 0.08), 0 1px 0 rgba(255,255,255,0.95) inset",
         }}
       >
         {stepHeader}
@@ -568,7 +724,7 @@ export default function Home() {
                   {files.length === 0 ? "请先上传至少一张图或一个视频" : wizardHold ? "可点下方按钮进入填写信息" : "即将自动进入「完善信息」…"}
                 </Typography>
                 {wizardHold && files.length > 0 && (
-                  <Button variant="outlined" fullWidth onClick={handleWizardContinue} sx={{ borderColor: "#ff2442", color: "#ff2442" }}>
+                  <Button variant="outlined" fullWidth onClick={handleWizardContinue} sx={{ borderRadius: "14px", py: 1.1, fontWeight: 600 }}>
                     前往完善信息
                   </Button>
                 )}
@@ -588,7 +744,15 @@ export default function Home() {
                 <Button
                   startIcon={<ArrowBackOutlined sx={{ fontSize: 18 }} />}
                   onClick={handleWizardBack}
-                  sx={{ alignSelf: "flex-start", color: "#666", fontSize: 13, mb: -0.5 }}
+                  sx={{
+                    alignSelf: "flex-start",
+                    color: "text.secondary",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    mb: -0.5,
+                    borderRadius: "10px",
+                    "&:hover": { bgcolor: "rgba(255,36,66,0.06)" },
+                  }}
                 >
                   返回上传
                 </Button>
@@ -601,7 +765,9 @@ export default function Home() {
         </AnimatePresence>
       </Paper>
 
-      <Typography sx={{ mt: 3, fontSize: "0.72rem", color: "#ccc" }}>薯医 NoteRx · AI 诊断仅供参考</Typography>
+      <Typography sx={{ mt: 3, fontSize: "0.72rem", color: "text.disabled", letterSpacing: "0.03em" }}>
+        薯医 NoteRx · AI 诊断仅供参考
+      </Typography>
     </Box>
   );
 

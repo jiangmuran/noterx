@@ -26,25 +26,31 @@ export default function CategoryPicker({ value, onChange }: Props) {
             key={cat.key}
             onClick={() => onChange(cat.key)}
             sx={{
-              px: 1.5,
-              py: 0.6,
-              borderRadius: "8px",
+              px: 1.65,
+              py: 0.65,
+              borderRadius: "999px",
               cursor: "pointer",
               fontSize: "0.82rem",
-              fontWeight: 500,
-              transition: "all 0.15s ease",
+              fontWeight: 600,
+              transition: "all 0.2s ease",
               userSelect: "none",
+              border: "1px solid transparent",
               ...(selected
                 ? {
-                    bgcolor: "#ff2442",
+                    background: "linear-gradient(135deg, #ff4d64 0%, #e61e3d 100%)",
                     color: "#fff",
+                    boxShadow: "0 4px 14px rgba(255, 36, 66, 0.35)",
+                    borderColor: "rgba(255,255,255,0.2)",
                   }
                 : {
-                    bgcolor: "#f5f5f5",
-                    color: "#666",
+                    bgcolor: "rgba(0,0,0,0.04)",
+                    color: "text.secondary",
+                    borderColor: "rgba(0,0,0,0.06)",
                     "&:hover": {
-                      bgcolor: "#eee",
-                      color: "#262626",
+                      bgcolor: "rgba(255,36,66,0.08)",
+                      color: "text.primary",
+                      borderColor: "rgba(255,36,66,0.2)",
+                      transform: "translateY(-1px)",
                     },
                   }),
             }}
