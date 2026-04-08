@@ -15,6 +15,7 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { motion } from "framer-motion";
 import {
   getHistoryList,
@@ -268,6 +269,28 @@ export default function History() {
                     {navigating === item.id && (
                       <CircularProgress size={16} sx={{ color: "#999" }} />
                     )}
+
+                    <Button
+                      size="small"
+                      variant="text"
+                      startIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                      sx={{
+                        color: "#666",
+                        minWidth: "unset",
+                        px: 0.5,
+                        textTransform: "none",
+                        fontSize: 12,
+                        flexShrink: 0,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!navigating) {
+                          handleOpen(item);
+                        }
+                      }}
+                    >
+                      查看结果
+                    </Button>
 
                     {/* 删除按钮 */}
                     <IconButton
