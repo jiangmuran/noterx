@@ -51,11 +51,11 @@ const themeOptions: ThemeOptions = {
 
   typography: {
     fontFamily: [
+      "Inter",
+      "Noto Sans SC",
       "PingFang SC",
-      "SF Pro Display",
       "-apple-system",
       "BlinkMacSystemFont",
-      "Helvetica Neue",
       "sans-serif",
     ].join(","),
     fontWeightRegular: 400,
