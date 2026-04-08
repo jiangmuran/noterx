@@ -426,18 +426,65 @@ export default function Home() {
           874 条真实数据 · 5 位 AI 专家诊断
         </Typography>
 
-        <Button
-          startIcon={<HistoryOutlined sx={{ fontSize: 15 }} />}
-          onClick={() => navigate("/history")}
-          size="small"
-          sx={{
-            color: "#999", fontSize: 12, fontWeight: 600, flexShrink: 0,
-            borderRadius: "10px", px: 1.25, minWidth: "auto",
-            "&:hover": { color: "#1a1a1a", bgcolor: "rgba(0,0,0,0.04)" },
-          }}
-        >
-          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>历史</Box>
-        </Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 0.5, md: 1 } }}>
+          <Button
+            onClick={() => { window.location.href = "/"; }}
+            size="small"
+            sx={{
+              color: "#bbb", fontSize: 12, fontWeight: 500, minWidth: "auto",
+              borderRadius: "8px", px: 1,
+              "&:hover": { color: "#ff2442", bgcolor: "rgba(255,36,66,0.04)" },
+            }}
+          >
+            白皮书
+          </Button>
+          <Button
+            startIcon={<HistoryOutlined sx={{ fontSize: 15 }} />}
+            onClick={() => navigate("/history")}
+            size="small"
+            sx={{
+              color: "#999", fontSize: 12, fontWeight: 600, flexShrink: 0,
+              borderRadius: "10px", px: 1.25, minWidth: "auto",
+              "&:hover": { color: "#1a1a1a", bgcolor: "rgba(0,0,0,0.04)" },
+            }}
+          >
+            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>历史</Box>
+          </Button>
+        </Box>
+      </Box>
+
+      {/* ═══════════ Hero ═══════════ */}
+      <Box
+        component={motion.div}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+        sx={{
+          textAlign: "center",
+          pt: { xs: 3.5, md: 4 },
+          pb: { xs: 2, md: 2.5 },
+          px: 3,
+        }}
+      >
+        <Typography sx={{
+          fontSize: { xs: 22, md: 28 },
+          fontWeight: 800,
+          color: "#1a1a1a",
+          letterSpacing: "-0.02em",
+          lineHeight: 1.3,
+          mb: 0.75,
+        }}>
+          AI 诊断你的小红书笔记
+        </Typography>
+        <Typography sx={{
+          fontSize: { xs: 14, md: 15 },
+          color: "#999",
+          lineHeight: 1.6,
+          maxWidth: 420,
+          mx: "auto",
+        }}>
+          上传笔记截图，5 位 AI 专家帮你发现问题、给出优化方案
+        </Typography>
       </Box>
 
       {/* ═══════════ Body ═══════════ */}
@@ -445,10 +492,10 @@ export default function Home() {
         flex: 1,
         display: "flex",
         justifyContent: "center",
-        alignItems: { xs: "flex-start", md: "center" },
+        alignItems: { xs: "flex-start", md: "flex-start" },
         px: { xs: 0, md: 3 },
-        py: { xs: 0, md: 2 },
-        pb: { xs: "88px", md: 2 },
+        py: { xs: 0, md: 0 },
+        pb: { xs: "88px", md: 3 },
         overflow: "auto",
       }}>
         <Box sx={{
@@ -493,7 +540,7 @@ export default function Home() {
                 )}
               </Box>
               <Typography sx={{ fontSize: 13, color: "#888", lineHeight: 1.5 }}>
-                把小红书笔记截图拖到这里，AI 自动识别标题、正文、分类
+                把小红书笔记的截图拖进来（详情页、封面、主页、评论区都行）
               </Typography>
             </Box>
 
