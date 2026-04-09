@@ -201,8 +201,6 @@ export default function Home() {
     const contentParts: string[] = [];  // 合并多张图的正文
     let bestCategory = "";
     let bestSummary = "";
-    let publisherName = "";
-    let followerCount = 0;
     let engLikes = 0, engCollects = 0, engComments = 0;
 
     // Pass 1: content 类型 — 标题取第一个, 正文全部合并
