@@ -12,41 +12,33 @@ from app.agents.base_agent import BaseAgent, MODEL_FAST
 router = APIRouter()
 logger = logging.getLogger("noterx.comments")
 
-COMMENT_PROMPT = """你是小红书评论区模拟器。根据给定的笔记信息，生成**极其真实**的小红书评论。
+COMMENT_PROMPT = """你是小红书评论区模拟器。模拟真实小红书评论区的样子。
 
-必须遵守的规则：
-1. 评论必须像真人写的，禁止AI味。参考真实高赞评论的风格：
-   - "绝了" "收藏了" "做了！真的好吃！" "求链接🔗" "有滤镜吧"
-   - "笑死" "绷不住了" "姐妹身高体重多少" "人均花费多少？"
-2. 50%的评论要很短（5-15字），30%中等（15-40字），20%较长（40-80字）
-3. 必须有1-2条质疑或吐槽（"广告吧" "真的假的" "没觉得好看"）
-4. 部分评论要有回复链（模拟抬杠/讨论）
-5. 用口语，不要书面语。可以有错别字、表情包标记（如[笑哭R]）
-6. 昵称要像真实小红书用户（"小王同学" "是橘子呀" "暴躁小张"），不要"用户A"
+## 核心规则：禁止AI味
+- 不要用"非常""建议""值得"这类书面词
+- 用真实网友的说话方式：口语、缩写、网络用语、打错字
 
-输出严格JSON格式：
-{
-  "comments": [
-    {
-      "username": "昵称",
-      "avatar_emoji": "一个表情",
-      "comment": "评论内容",
-      "sentiment": "positive/negative/neutral",
-      "likes": 预估点赞数(整数,热评50-500,普通0-50),
-      "replies": [
-        {
-          "username": "回复者昵称",
-          "avatar_emoji": "表情",
-          "comment": "回复内容",
-          "sentiment": "positive/negative/neutral",
-          "likes": 预估点赞数(整数)
-        }
-      ]
-    }
-  ]
-}
+## 评论风格参考（真实高赞评论）
+短评："绝了" / "马住" / "蹲" / "做了！" / "啊啊啊啊啊好好看" / "求链接" / "什么价位"
+中评："姐妹这个在哪买的啊 我找了好久" / "试了 真的有用 已经推荐给闺蜜了"
+长评："作为一个XX了3年的人说一下，这个方法确实可以但是有个坑要注意……"
+质疑："广吧" / "srds感觉一般" / "有滤镜吧这个" / "我买了翻车了怎么办"
+纯凑热闹："哈哈哈哈哈前排" / "我就知道评论区有人会问" / "来了来了"
 
-注意：生成5-6条主评论，其中2-3条要有1-3个回复。"""
+## 昵称风格
+必须像真实XHS用户：如"是小鹿呀""减脂第30天""北漂打工人""暴躁小张""奶茶续命中""考研倒计时xx天""爱吃的CC"
+
+## 必须满足
+1. 40%短评(5-12字)、30%中评(15-40字)、30%长评(40-100字)
+2. 至少1条质疑/吐槽（不是所有人都夸）
+3. 至少2条有回复（模拟楼中楼讨论）
+4. 每条评论带字段：username, comment, sentiment, likes(数字0-999), time_ago(如"3小时前""昨天""2天前"), ip_location(如"北京""广东""浙江""四川")
+5. 可以有1条标记 is_author:true 的作者回复
+
+## JSON格式
+{"comments":[{"username":"昵称","comment":"内容","sentiment":"positive/negative/neutral","likes":数字,"time_ago":"时间","ip_location":"省份","is_author":false,"replies":[同结构]}]}
+
+生成5-6条主评论，2-3条有回复。"""
 
 
 class GenerateCommentsRequest(BaseModel):
@@ -87,17 +79,21 @@ async def generate_comments(req: GenerateCommentsRequest):
             if isinstance(r, dict):
                 replies.append({
                     "username": r.get("username", "小红薯用户"),
-                    "avatar_emoji": r.get("avatar_emoji", "😊"),
                     "comment": r.get("comment", ""),
                     "sentiment": r.get("sentiment", "neutral"),
                     "likes": int(r.get("likes", 0)) if r.get("likes") is not None else 0,
+                    "time_ago": r.get("time_ago", "刚刚"),
+                    "ip_location": r.get("ip_location", ""),
+                    "is_author": bool(r.get("is_author", False)),
                 })
         formatted.append({
             "username": c.get("username", "小红薯用户"),
-            "avatar_emoji": c.get("avatar_emoji", "😊"),
             "comment": c.get("comment", ""),
             "sentiment": c.get("sentiment", "neutral"),
             "likes": int(c.get("likes", 0)) if c.get("likes") is not None else 0,
+            "time_ago": c.get("time_ago", "刚刚"),
+            "ip_location": c.get("ip_location", ""),
+            "is_author": bool(c.get("is_author", False)),
             "replies": replies,
         })
 

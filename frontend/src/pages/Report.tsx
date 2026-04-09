@@ -9,8 +9,11 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ReplayIcon from "@mui/icons-material/Replay";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { motion } from "framer-motion";
-import type { DiagnoseResult, PreScoreResult } from "../utils/api";
-import { saveHistory, preScore } from "../utils/api";
+import type { DiagnoseResult, PreScoreResult, OptimizePlan } from "../utils/api";
+import { saveHistory, preScore, optimizeDiagnosis } from "../utils/api";
+import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+import StarIcon from "@mui/icons-material/Star";
+import CircularProgress from "@mui/material/CircularProgress";
 import {
   migrateLegacyLocalStorage,
   createPendingId,
@@ -122,6 +125,31 @@ export default function Report() {
     }, 150);
     return () => clearInterval(timer);
   }, []);
+
+  // Optimization engine state
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizePlans, setOptimizePlans] = useState<OptimizePlan[]>([]);
+  const [showOptPanel, setShowOptPanel] = useState(false);
+
+  const handleOptimize = async () => {
+    setOptimizing(true);
+    setShowOptPanel(true);
+    try {
+      const result = await optimizeDiagnosis({
+        title: params.title,
+        content: params.content || "",
+        category: params.category,
+        issues: JSON.stringify(report.issues?.slice(0, 5) || []),
+        suggestions: JSON.stringify(report.suggestions?.slice(0, 5) || []),
+        overall_score: report.overall_score,
+      });
+      setOptimizePlans(result.plans);
+    } catch (e) {
+      console.warn("优化失败", e);
+    } finally {
+      setOptimizing(false);
+    }
+  };
 
   const copyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -322,7 +350,97 @@ export default function Report() {
 
           </motion.div>
 
-          {/* Row 5: Export */}
+          {/* Row 5: Optimization Engine */}
+          <motion.div {...sectionAnim(5)}>
+          <Box sx={{ ...card, mb: sectionGap }}>
+            {!showOptPanel ? (
+              <Button
+                variant="contained" fullWidth
+                startIcon={<AutoFixHighIcon />}
+                onClick={handleOptimize}
+                sx={{
+                  py: 1.5, fontSize: 15, fontWeight: 700, borderRadius: "12px",
+                  background: "linear-gradient(135deg, #ff3d5c, #e61e3d)",
+                  boxShadow: "0 4px 20px rgba(255,36,66,0.25)",
+                  "&:hover": { boxShadow: "0 8px 28px rgba(255,36,66,0.35)", transform: "translateY(-1px)" },
+                }}
+              >
+                继续优化 — AI 生成高分方案
+              </Button>
+            ) : (
+              <Box>
+                <Typography sx={{ fontWeight: 700, fontSize: 15, color: "#262626", mb: 2 }}>
+                  AI 优化方案
+                </Typography>
+
+                {optimizing && (
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, py: 4 }}>
+                    <CircularProgress size={20} sx={{ color: "#ff2442" }} />
+                    <Typography sx={{ fontSize: 14, color: "#666" }}>正在生成优化方案...</Typography>
+                  </Box>
+                )}
+
+                {optimizePlans.length > 0 && (
+                  <Stack spacing={1.5}>
+                    {optimizePlans.map((plan, i) => (
+                      <Box key={i} sx={{
+                        p: 2, borderRadius: "12px",
+                        bgcolor: plan.recommended ? "#fff5f6" : "#fafafa",
+                        border: plan.recommended ? "1.5px solid #fecaca" : "1px solid #f0f0f0",
+                        position: "relative",
+                      }}>
+                        {plan.recommended && (
+                          <Box sx={{
+                            position: "absolute", top: -1, right: 12,
+                            px: 1, py: 0.25, borderRadius: "0 0 6px 6px",
+                            bgcolor: "#ff2442",
+                          }}>
+                            <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 0.3 }}>
+                              <StarIcon sx={{ fontSize: 10 }} /> 推荐
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#262626" }}>
+                            {plan.strategy}
+                          </Typography>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                            <Typography sx={{ fontSize: 18, fontWeight: 800, color: plan.score_delta > 0 ? "#16a34a" : "#666" }}>
+                              {plan.score}
+                            </Typography>
+                            {plan.score_delta > 0 && (
+                              <Box sx={{ px: 0.5, py: 0.15, borderRadius: "6px", bgcolor: "#dcfce7" }}>
+                                <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#16a34a" }}>+{plan.score_delta}</Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </Box>
+
+                        <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#ff2442", mb: 0.5 }}>
+                          {plan.optimized_title}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "#666", lineHeight: 1.6, mb: 1,
+                          display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                          {plan.optimized_content}
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          <Button size="small" onClick={() => copyText(`${plan.optimized_title}\n\n${plan.optimized_content}`, "方案")}
+                            startIcon={<ContentCopyIcon sx={{ fontSize: 13 }} />}
+                            sx={{ fontSize: 11, color: "#999", "&:hover": { color: "#262626" } }}>
+                            复制
+                          </Button>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            )}
+          </Box>
+          </motion.div>
+
+          {/* Row 6: Export */}
           <motion.div {...sectionAnim(5)}>
           <Box sx={card}>
             <DiagnoseCard report={report} title={params.title} />

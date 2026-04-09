@@ -345,6 +345,11 @@ class Orchestrator:
             overall_score = float(final_report.get("score", 0))
         else:
             overall_score = float(final_report.get("overall_score", 50))
+        # Clamp score to 0-100 and round to integer for stability
+        overall_score = round(max(0, min(100, overall_score)))
+        # Clamp radar dimensions too
+        for k in radar_data:
+            radar_data[k] = round(max(0, min(100, float(radar_data[k]))))
         grade = final_report.get("grade") if not is_llm_error else "D"
         if not grade:
             grade = self._calc_grade(overall_score)

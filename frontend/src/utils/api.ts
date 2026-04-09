@@ -30,10 +30,13 @@ export interface AgentOpinion {
 
 export interface SimulatedComment {
   username: string;
-  avatar_emoji: string;
+  avatar_emoji?: string;
   comment: string;
   sentiment: "positive" | "negative" | "neutral";
   likes?: number;
+  time_ago?: string;
+  ip_location?: string;
+  is_author?: boolean;
 }
 
 export interface DebateEntry {
@@ -197,6 +200,35 @@ export async function generateComments(params: {
     params
   );
   return data.comments;
+}
+
+// --------------- 迭代优化 ---------------
+
+export interface OptimizePlan {
+  strategy: string;
+  optimized_title: string;
+  optimized_content: string;
+  key_changes: string;
+  score: number;
+  score_delta: number;
+  recommended?: boolean;
+}
+
+export interface OptimizeResult {
+  original_score: number;
+  plans: OptimizePlan[];
+}
+
+export async function optimizeDiagnosis(params: {
+  title: string;
+  content: string;
+  category: string;
+  issues: string;
+  suggestions: string;
+  overall_score: number;
+}): Promise<OptimizeResult> {
+  const { data } = await api.post<OptimizeResult>("/optimize", params);
+  return data;
 }
 
 // --------------- 历史记录 ---------------

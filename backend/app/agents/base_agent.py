@@ -157,8 +157,12 @@ class BaseAgent:
             kwargs = {
                 "model": self.model,
                 "messages": messages,
-                "temperature": float(os.getenv("LLM_TEMPERATURE", "0.7")),
+                "temperature": float(os.getenv("LLM_TEMPERATURE", "0")),
             }
+            # seed for reproducibility (if supported by provider)
+            seed_val = os.getenv("LLM_SEED", "")
+            if seed_val:
+                kwargs["seed"] = int(seed_val)
             if mimo:
                 kwargs["max_completion_tokens"] = max_out
             else:
