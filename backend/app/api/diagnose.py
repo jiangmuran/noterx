@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import logging
 import os
 import re
@@ -144,32 +145,121 @@ def _cleanup_expired_temp_videos(now_ts: Optional[int] = None) -> None:
                 logger.warning("Failed to delete expired temp video: %s", item)
 
 
+def _resolve_public_base_url(request: Request) -> tuple[str, str]:
+    """
+    解析用于生成 temp-video 公网链接的基址与来源。
+    @returns (base_url, source) where source in {"env", "forwarded", "request_base"}
+    """
+    if TEMP_VIDEO_PUBLIC_BASE_URL:
+        return TEMP_VIDEO_PUBLIC_BASE_URL, "env"
+    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    host = (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
+    if proto and host:
+        return f"{proto}://{host}".rstrip("/"), "forwarded"
+    return str(request.base_url).rstrip("/"), "request_base"
+
+
 def _build_public_base_url(request: Request) -> str:
     """
     生成 MiMo 等云端服务可拉取的 API 根 URL（不含路径）。
     上线时在反向代理后应配置 X-Forwarded-Proto / X-Forwarded-Host；
     或显式设置 MIMO_VIDEO_PUBLIC_BASE_URL（推荐固定为对外的 https 域名）。
     """
-    if TEMP_VIDEO_PUBLIC_BASE_URL:
-        return TEMP_VIDEO_PUBLIC_BASE_URL
-    proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
-    host = (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
-    if proto and host:
-        return f"{proto}://{host}".rstrip("/")
-    return str(request.base_url).rstrip("/")
+    base_url, _ = _resolve_public_base_url(request)
+    return base_url
+
+
+def _is_public_host(host: str) -> bool:
+    """判断 host 是否可被云端服务访问（尽力判定）。"""
+    h = (host or "").strip().lower().strip("[]")
+    if not h:
+        return False
+    if h in ("localhost", "127.0.0.1", "::1"):
+        return False
+    if h.endswith(".local") or h.endswith(".internal") or h.endswith(".lan") or h.endswith(".home.arpa"):
+        return False
+
+    try:
+        ip = ipaddress.ip_address(h)
+    except ValueError:
+        # 单标签主机名通常为内网 DNS 别名
+        if "." not in h:
+            return False
+        return True
+
+    return not (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_reserved
+        or ip.is_multicast
+        or ip.is_unspecified
+    )
+
+
+def get_public_base_url_diagnostics(request: Request) -> dict:
+    """
+    返回 video_url 可用性诊断信息。
+    字段：
+    - ok: 是否可用
+    - reason: 不可用原因（或 ok）
+    - source: 基址来源 env/forwarded/request_base
+    - base_url: 解析出的基址
+    - scheme/host: 解析出的协议与主机
+    """
+    base_url, source = _resolve_public_base_url(request)
+    parsed = urlparse(base_url)
+    scheme = (parsed.scheme or "").lower()
+    host = (parsed.hostname or "").lower()
+
+    if not scheme or not host:
+        return {
+            "ok": False,
+            "reason": "base_url 解析失败（缺少 scheme 或 host）",
+            "source": source,
+            "base_url": base_url,
+            "scheme": scheme,
+            "host": host,
+        }
+    if scheme not in ("http", "https"):
+        return {
+            "ok": False,
+            "reason": f"不支持的协议: {scheme}",
+            "source": source,
+            "base_url": base_url,
+            "scheme": scheme,
+            "host": host,
+        }
+    if not _is_public_host(host):
+        return {
+            "ok": False,
+            "reason": f"host 非公网可达: {host}",
+            "source": source,
+            "base_url": base_url,
+            "scheme": scheme,
+            "host": host,
+        }
+
+    warning = ""
+    if scheme != "https":
+        warning = "建议使用 https 公网地址，避免第三方拉取失败"
+    return {
+        "ok": True,
+        "reason": "ok",
+        "source": source,
+        "base_url": base_url,
+        "scheme": scheme,
+        "host": host,
+        "warning": warning,
+    }
 
 
 def public_base_url_is_localhost_only(request: Request) -> bool:
     """
-    判断当前请求推导出的对外基址是否仅为本机（云端模型无法拉取 temp-video）。
-    显式配置了 MIMO_VIDEO_PUBLIC_BASE_URL 时视为已配置公网入口（由运维保证 MiMo 可访问）。
+    兼容旧调用方：返回是否“不适合云端拉取 temp-video”。
+    注意：名称历史遗留，当前判定不仅覆盖 localhost，也覆盖私网/内网 host。
     """
-    if TEMP_VIDEO_PUBLIC_BASE_URL:
-        return False
-    host = (urlparse(_build_public_base_url(request)).hostname or "").lower()
-    if not host:
-        return False
-    return host in ("localhost", "127.0.0.1", "::1")
+    return not bool(get_public_base_url_diagnostics(request).get("ok"))
 
 
 def _store_temp_video_and_build_url(request: Request, video_bytes: bytes, mime: str) -> str:
@@ -186,6 +276,23 @@ def _store_temp_video_and_build_url(request: Request, video_bytes: bytes, mime: 
     sig = _sign_temp_video(file_name, exp)
     base = _build_public_base_url(request)
     return f"{base}/api/temp-video/{file_name}?exp={exp}&sig={sig}"
+
+
+@router.get("/video-public-url-health")
+async def video_public_url_health(request: Request):
+    """
+    返回当前环境下 video_url 公网可达性诊断结果（用于联调排错）。
+    """
+    diag = get_public_base_url_diagnostics(request)
+    return {
+        **diag,
+        "temp_video_ttl_seconds": TEMP_VIDEO_TTL_SECONDS,
+        "max_video_upload_mb": MAX_VIDEO_SIZE // (1024 * 1024),
+        "recommendation": (
+            "若 ok=false，请设置 MIMO_VIDEO_PUBLIC_BASE_URL 为公网 HTTPS 域名；"
+            "或在反向代理正确透传 X-Forwarded-Proto / X-Forwarded-Host。"
+        ),
+    }
 
 
 @router.get("/temp-video/{file_name}")
@@ -260,19 +367,21 @@ async def diagnose_note(
     # Video analysis via MiMo omni
     video_analysis: Optional[dict] = None
 
-    if image_bytes is None and video_bytes is not None:
+    if video_bytes is not None:
         mime_for_video = (video_file.content_type if video_file else None) or "video/mp4"
         ext = MIME_TO_EXT.get(mime_for_video, ".mp4")
-        # Extract first frame as fallback cover image
-        extracted = _extract_first_video_frame(video_bytes, ext)
-        if extracted is not None:
-            image_bytes = extracted
-            logger.info("Using first frame from video for visual analysis")
-        else:
-            logger.info("Video frame extraction failed, visual baseline may fallback")
+        url_diag = get_public_base_url_diagnostics(request)
+        # 仅在无封面图时从视频抽首帧作为视觉兜底
+        if image_bytes is None:
+            extracted = _extract_first_video_frame(video_bytes, ext)
+            if extracted is not None:
+                image_bytes = extracted
+                logger.info("Using first frame from video for visual analysis")
+            else:
+                logger.info("Video frame extraction failed, visual baseline may fallback")
 
-        # Try MiMo video understanding via signed temp URL（需公网可访问的基址，见 _build_public_base_url）
-        if mime_for_video in MIMO_VIDEO_MIME and not public_base_url_is_localhost_only(request):
+        # 只要上传了视频就尝试做视频理解（即便同时上传了封面/正文图）
+        if mime_for_video in MIMO_VIDEO_MIME and bool(url_diag.get("ok")):
             logger.info("Trying MiMo video understanding via signed temp URL (%s)", mime_for_video)
             try:
                 from app.analysis.video_analyzer import VideoAnalyzer
@@ -287,27 +396,35 @@ async def diagnose_note(
                 logger.warning("Video understanding failed, fallback to title/content inference: %s", e)
         elif mime_for_video in MIMO_VIDEO_MIME:
             logger.info(
-                "Skip MiMo video_url (API base URL is localhost-only); "
+                "Skip MiMo video_url: %s (source=%s, base=%s); "
                 "set MIMO_VIDEO_PUBLIC_BASE_URL or X-Forwarded-* for full video understanding",
+                url_diag.get("reason"),
+                url_diag.get("source"),
+                url_diag.get("base_url"),
             )
         else:
             logger.info("Video mime %s outside MiMo supported types; skip video understanding", mime_for_video)
 
     tag_list = [token.strip() for token in tags.split(",") if token.strip()] if tags else []
 
-    if image_bytes and not title.strip():
+    if parsed_images and not title.strip():
         logger.info("Title is empty; trying OCR")
         from app.agents.base_agent import _get_client
         from app.analysis.ocr_processor import OCRProcessor
 
         ocr = OCRProcessor()
-        ocr_result = await ocr.extract_text(image_bytes, client=_get_client())
-        if ocr_result.get("title"):
-            title = ocr_result["title"]
-        if not content.strip() and ocr_result.get("content"):
-            content = ocr_result["content"]
-        if not tag_list and ocr_result.get("tags"):
-            tag_list = ocr_result["tags"]
+        # 多图场景下按顺序尝试 OCR，优先补齐标题，其次补齐正文/标签
+        for idx, one_image in enumerate(parsed_images):
+            ocr_result = await ocr.extract_text(one_image, client=_get_client())
+            if not title.strip() and ocr_result.get("title"):
+                title = ocr_result["title"]
+            if not content.strip() and ocr_result.get("content"):
+                content = ocr_result["content"]
+            if not tag_list and ocr_result.get("tags"):
+                tag_list = ocr_result["tags"]
+            logger.info("OCR[%d] output: title=%s, tags=%s", idx, title[:30] if title else "", tag_list)
+            if title.strip() and content.strip():
+                break
         logger.info("OCR output: title=%s, tags=%s", title[:30] if title else "", tag_list)
 
     if not title.strip():
@@ -381,14 +498,16 @@ async def diagnose_stream(
     image_bytes = parsed_images[0] if parsed_images else None
 
     video_analysis: Optional[dict] = None
-    if image_bytes is None and video_bytes is not None:
+    if video_bytes is not None:
         mime_for_video = (video_file.content_type if video_file else None) or "video/mp4"
         ext = MIME_TO_EXT.get(mime_for_video, ".mp4")
-        extracted = _extract_first_video_frame(video_bytes, ext)
-        if extracted is not None:
-            image_bytes = extracted
+        url_diag = get_public_base_url_diagnostics(request)
+        if image_bytes is None:
+            extracted = _extract_first_video_frame(video_bytes, ext)
+            if extracted is not None:
+                image_bytes = extracted
 
-        if mime_for_video in MIMO_VIDEO_MIME and not public_base_url_is_localhost_only(request):
+        if mime_for_video in MIMO_VIDEO_MIME and bool(url_diag.get("ok")):
             try:
                 from app.analysis.video_analyzer import VideoAnalyzer
                 video_url = _store_temp_video_and_build_url(request, video_bytes, mime_for_video)
@@ -396,20 +515,30 @@ async def diagnose_stream(
                 video_analysis = await analyzer.analyze(video_url, prompt_hint=f"title={title[:80]} | category={category}")
             except Exception as e:
                 logger.warning("Video understanding failed: %s", e)
+        elif mime_for_video in MIMO_VIDEO_MIME:
+            logger.info(
+                "Skip MiMo video_url(stream): %s (source=%s, base=%s)",
+                url_diag.get("reason"),
+                url_diag.get("source"),
+                url_diag.get("base_url"),
+            )
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 
-    if image_bytes and not title.strip():
+    if parsed_images and not title.strip():
         from app.agents.base_agent import _get_client
         from app.analysis.ocr_processor import OCRProcessor
         ocr = OCRProcessor()
-        ocr_result = await ocr.extract_text(image_bytes, client=_get_client())
-        if ocr_result.get("title"):
-            title = ocr_result["title"]
-        if not content.strip() and ocr_result.get("content"):
-            content = ocr_result["content"]
-        if not tag_list and ocr_result.get("tags"):
-            tag_list = ocr_result["tags"]
+        for one_image in parsed_images:
+            ocr_result = await ocr.extract_text(one_image, client=_get_client())
+            if not title.strip() and ocr_result.get("title"):
+                title = ocr_result["title"]
+            if not content.strip() and ocr_result.get("content"):
+                content = ocr_result["content"]
+            if not tag_list and ocr_result.get("tags"):
+                tag_list = ocr_result["tags"]
+            if title.strip() and content.strip():
+                break
 
     if not title.strip():
         raise HTTPException(400, "请输入标题，或上传可识别标题的图片/视频")

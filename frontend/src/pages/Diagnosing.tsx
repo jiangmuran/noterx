@@ -159,7 +159,13 @@ export default function Diagnosing() {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const params = location.state as {
-    title: string; content: string; tags: string; category: string; coverFile: File | null; videoFile?: File | null;
+    title: string;
+    content: string;
+    tags: string;
+    category: string;
+    coverFile: File | null;
+    coverImages?: File[];
+    videoFile?: File | null;
   } | null;
 
   const [step, setStep] = useState(0);
@@ -184,7 +190,7 @@ export default function Diagnosing() {
     preScore({
       title: params.title, content: params.content,
       category: params.category, tags: params.tags,
-      image_count: params.coverFile ? 1 : 0,
+      image_count: params.coverImages?.length ?? (params.coverFile ? 1 : 0),
     }).then((ps) => {
       if (!cancelled) {
         setPreScoreData(ps);
@@ -200,6 +206,7 @@ export default function Diagnosing() {
             title: params.title, content: params.content,
             category: params.category, tags: params.tags,
             coverImage: params.coverFile ?? undefined,
+            coverImages: params.coverImages ?? undefined,
             videoFile: params.videoFile ?? undefined,
           },
           (event: StreamEvent) => {
@@ -229,6 +236,7 @@ export default function Diagnosing() {
             title: params.title, content: params.content,
             category: params.category, tags: params.tags,
             coverImage: params.coverFile ?? undefined,
+            coverImages: params.coverImages ?? undefined,
             videoFile: params.videoFile ?? undefined,
           });
           resultRef.current = { report: result, isFallback: false };
@@ -240,6 +248,7 @@ export default function Diagnosing() {
             title: params.title, content: params.content,
             category: params.category, tags: params.tags,
             coverImage: params.coverFile ?? undefined,
+            coverImages: params.coverImages ?? undefined,
             videoFile: params.videoFile ?? undefined,
           });
           resultRef.current = { report: result, isFallback: false };

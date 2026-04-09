@@ -61,7 +61,8 @@ def _build_stable_scores(
         saturation = float(image_analysis.get("saturation", 0)) * 100
         text_ratio = float(image_analysis.get("text_ratio", 0))
         text_balance = max(0.0, 100.0 - abs(text_ratio - 0.22) * 260.0)
-        face_bonus = 8.0 if image_analysis.get("has_face") else 0.0
+        face_seen = bool(image_analysis.get("has_face")) or bool((video_analysis or {}).get("has_face"))
+        face_bonus = 8.0 if face_seen else 0.0
         visual_score = _clamp_score(
             visual_quality * 0.7 + saturation * 0.15
             + text_balance * 0.15 + face_bonus
@@ -193,10 +194,11 @@ class Orchestrator:
             "tags": tags,
         }
         if image_analysis:
+            face_seen = bool(image_analysis.get("has_face")) or bool((video_analysis or {}).get("has_face"))
             note_features.update({
                 "saturation": image_analysis.get("saturation", 0),
                 "text_ratio": image_analysis.get("text_ratio", 0),
-                "has_face": image_analysis.get("has_face", False),
+                "has_face": face_seen,
             })
         elif video_analysis:
             note_features.update({
@@ -211,7 +213,7 @@ class Orchestrator:
             content=content,
             category=category,
             tag_count=len(tags),
-            image_count=image_analysis.get("image_count", 0) if image_analysis else 0,
+            image_count=1 if (image_analysis or video_analysis) else 0,
         )
         baseline_comparison["model_a_pre_score"] = model_a_score
         # 确定性雷达分数（不依赖LLM，同一输入永远相同）

@@ -28,23 +28,26 @@ class VisualAgent(BaseAgent):
         """Build prompt with image analysis/video analysis + baseline comparison."""
         comparisons = baseline_comparison.get("comparisons", {})
 
+        image_parts: list[str] = []
         if image_analysis:
-            image_info = f"""## 封面图像分析
+            image_parts.append(f"""## 封面图像分析
 - 尺寸: {image_analysis.get('width', 0)}x{image_analysis.get('height', 0)}
 - 宽高比: {image_analysis.get('aspect_ratio', 0)}
 - 饱和度: {image_analysis.get('saturation', 0)}
 - 亮度: {image_analysis.get('brightness', 0)}
 - 检测到人脸: {'是' if image_analysis.get('has_face') else '否'}
 - 文字区域占比: {image_analysis.get('text_ratio', 0)}
-- 主色调: {json.dumps(image_analysis.get('dominant_colors', []), ensure_ascii=False)}"""
-        elif video_analysis:
-            image_info = f"""## 视频理解结果（用于视觉诊断）
+- 主色调: {json.dumps(image_analysis.get('dominant_colors', []), ensure_ascii=False)}""")
+        if video_analysis:
+            image_parts.append(f"""## 视频理解结果（用于视觉诊断）
 - 摘要: {video_analysis.get('summary', '')}
 - 场景关键词: {json.dumps(video_analysis.get('scene_keywords', []), ensure_ascii=False)}
 - 推荐封面方向: {video_analysis.get('cover_suggestion', '')}
 - 是否有人脸: {'是' if video_analysis.get('has_face') else '否'}
 - 镜头风格: {video_analysis.get('shot_style', '')}
-- 风险/限制: {json.dumps(video_analysis.get('risk_or_limitations', []), ensure_ascii=False)}"""
+- 风险/限制: {json.dumps(video_analysis.get('risk_or_limitations', []), ensure_ascii=False)}""")
+        if image_parts:
+            image_info = "\n\n".join(image_parts)
         else:
             image_info = "## 封面图像分析\n未收到封面图片，请基于标题和垂类给出封面建议。"
 

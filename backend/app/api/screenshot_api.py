@@ -24,7 +24,7 @@ from app.api.diagnose import (
     MIMO_VIDEO_MIME,
     _extract_first_video_frame,
     _store_temp_video_and_build_url,
-    public_base_url_is_localhost_only,
+    get_public_base_url_diagnostics,
 )
 
 router = APIRouter()
@@ -464,11 +464,15 @@ async def quick_recognize_video(request: Request, file: UploadFile = File(...)):
     ocr_cap = int(os.getenv("QUICK_RECOGNIZE_OCR_MAX_TOKENS", "32768"))
 
     result: dict = {}
-    try_mimo_video_url = mime in MIMO_VIDEO_MIME and not public_base_url_is_localhost_only(request)
+    url_diag = get_public_base_url_diagnostics(request)
+    try_mimo_video_url = mime in MIMO_VIDEO_MIME and bool(url_diag.get("ok"))
     if not try_mimo_video_url and mime in MIMO_VIDEO_MIME:
         logger.info(
-            "视频快识：当前推导的 API 基址为内网/本机，跳过 MiMo video_url；"
+            "视频快识：跳过 MiMo video_url，原因=%s，source=%s，base=%s；"
             "上线请设置 MIMO_VIDEO_PUBLIC_BASE_URL，或由反向代理传入 X-Forwarded-Proto / X-Forwarded-Host",
+            url_diag.get("reason"),
+            url_diag.get("source"),
+            url_diag.get("base_url"),
         )
     if try_mimo_video_url:
         try:
@@ -576,7 +580,7 @@ async def deep_analyze(
             raise HTTPException(400, f"视频格式不支持: {video.content_type}")
         video_data = await video.read()
         if len(video_data) > MAX_VIDEO_SIZE:
-            raise HTTPException(400, "视频不能超过 100MB")
+            raise HTTPException(400, f"视频不能超过 {MAX_VIDEO_SIZE // (1024 * 1024)}MB")
         video_info = {
             "filename": video.filename,
             "size_mb": round(len(video_data) / (1024 * 1024), 1),
