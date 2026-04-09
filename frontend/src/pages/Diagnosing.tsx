@@ -518,223 +518,154 @@ export default function Diagnosing() {
             )}
           </Box>
 
-          {/* ═══ Right column: Progress + Engagement ═══ */}
-          <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
 
-            {/* Note preview — 让用户等待时有东西看 */}
-            {(params.title || params.content) && (
-              <Box sx={{ px: 1.5, py: 1.25, borderRadius: "10px", bgcolor: "#f9f9f9", border: "1px solid #f0f0f0" }}>
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#262626", lineHeight: 1.4, mb: params.content ? 0.5 : 0 }}>
-                  {params.title || "无标题"}
-                </Typography>
-                {params.content && (
-                  <Typography sx={{
-                    fontSize: 12, color: "#888", lineHeight: 1.5,
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-                  }}>
-                    {params.content}
-                  </Typography>
-                )}
+          {/* ═══ Right column: Step Timeline ═══ */}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0 }}>
+
+            {/* Progress bar at top */}
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ height: 4, bgcolor: "#f0f0f0", borderRadius: 2, overflow: "hidden" }}>
+                <Box sx={{
+                  height: "100%", borderRadius: 2, bgcolor: "#ff2442",
+                  width: `${progress}%`,
+                  transition: "width 0.5s ease",
+                }} />
               </Box>
-            )}
+              <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
+                <Typography sx={{ fontSize: 11, color: "#999" }}>{step + 1}/{STEPS.length}</Typography>
+                <Typography sx={{ fontSize: 11, color: "#bbb" }}>{elapsed}s</Typography>
+              </Box>
+            </Box>
 
-            {/* Current step */}
-            <Box>
+            {/* Vertical step timeline */}
+            {STEPS.map((s, i) => {
+              const isDone = i < step;
+              const isActive = i === step;
+              const isPending = i > step;
+              const isDebatePhase = i === 8;
+              const isJudgePhase = i === 9;
+
+              return (
+                <Box key={i} sx={{ display: "flex", gap: 1.5, pb: i < STEPS.length - 1 ? 0 : 0 }}>
+                  {/* Timeline line + dot */}
+                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: 20, flexShrink: 0 }}>
+                    <Box sx={{
+                      width: isDone ? 16 : isActive ? 18 : 12,
+                      height: isDone ? 16 : isActive ? 18 : 12,
+                      borderRadius: "50%",
+                      bgcolor: isDone ? "#10b981" : isActive ? "#ff2442" : "#e8e8e8",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      transition: "all 0.3s",
+                      boxShadow: isActive ? "0 0 8px rgba(255,36,66,0.3)" : "none",
+                    }}>
+                      {isDone && (
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      )}
+                      {isActive && (
+                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#fff" }} />
+                      )}
+                    </Box>
+                    {i < STEPS.length - 1 && (
+                      <Box sx={{
+                        width: 2, flex: 1, minHeight: 16,
+                        bgcolor: isDone ? "#10b981" : "#f0f0f0",
+                        transition: "background-color 0.3s",
+                      }} />
+                    )}
+                  </Box>
+
+                  {/* Step content */}
+                  <Box sx={{ flex: 1, minWidth: 0, pb: 1.5 }}>
+                    <Typography sx={{
+                      fontSize: isActive ? 14 : 13,
+                      fontWeight: isActive ? 700 : isDone ? 500 : 400,
+                      color: isDone ? "#10b981" : isActive ? "#1a1a1a" : "#ccc",
+                      lineHeight: 1.3,
+                      transition: "all 0.3s",
+                    }}>
+                      {s.label}
+                    </Typography>
+                    {isActive && (
+                      <Typography sx={{ fontSize: 11, color: "#999", mt: 0.25 }}>
+                        {s.desc}
+                      </Typography>
+                    )}
+
+                    {/* Debate phase: show live messages */}
+                    {isDebatePhase && (isDone || isActive) && debateMsgs.length > 0 && (
+                      <Box sx={{ mt: 1, display: "flex", flexDirection: "column", gap: 0.75 }}>
+                        {debateMsgs.map((msg, j) => {
+                          const colors = ["#ff2442", "#8b5cf6", "#f59e0b", "#3b82f6"];
+                          const bgColors = ["#fff5f6", "#faf5ff", "#fffbeb", "#eff6ff"];
+                          return (
+                            <Box key={j} sx={{
+                              px: 1.25, py: 0.75, borderRadius: "8px",
+                              bgcolor: bgColors[j % 4],
+                              borderLeft: `2px solid ${colors[j % 4]}`,
+                            }}>
+                              <Typography sx={{ fontSize: 11, color: "#444", lineHeight: 1.5 }}>
+                                {msg}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    )}
+
+                    {/* Judge phase: show status */}
+                    {isJudgePhase && isActive && (
+                      <Box sx={{ mt: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                          <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#10b981" }} />
+                        </motion.div>
+                        <Typography sx={{ fontSize: 11, color: "#10b981" }}>
+                          综合裁判正在评定最终报告...
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+              );
+            })}
+
+            {/* Tips / Quiz below timeline */}
+            <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #f0f0f0" }}>
+              <Typography sx={{ fontSize: 10, fontWeight: 600, color: "#10b981", mb: 0.5, letterSpacing: "0.04em" }}>
+                数据洞察
+              </Typography>
               <AnimatePresence mode="wait">
-                <motion.div key={step} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
-                  <Typography sx={{ fontSize: { xs: 17, md: 20 }, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.01em" }}>
-                    {currentStep.label}
-                  </Typography>
-                  <Typography sx={{ fontSize: 13, color: "#999", mt: 0.25 }}>
-                    {currentStep.desc}
+                <motion.div key={tipIdx} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                  <Typography sx={{ fontSize: 12, color: "#666", lineHeight: 1.6 }}>
+                    {tips[tipIdx]}
                   </Typography>
                 </motion.div>
               </AnimatePresence>
             </Box>
 
-            {/* Agent strip */}
-            <Box sx={{ display: "flex", gap: { xs: 0.5, md: 0.75 }, flexWrap: "wrap" }}>
-              {AGENTS.map((agent, i) => {
-                const isDone = step >= agent.doneStep;
-                const isActive = !isDone && step >= agent.activeStep;
-                return (
-                  <motion.div key={agent.name}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.06, duration: 0.3 }}
-                  >
-                    <Box sx={{
-                      display: "flex", alignItems: "center", gap: 0.5,
-                      px: 1.25, py: 0.5, borderRadius: "20px",
-                      bgcolor: isDone ? "#f0fdf4" : isActive ? "#fff5f6" : "#f9f9f9",
-                      border: "1px solid",
-                      borderColor: isDone ? "#bbf7d0" : isActive ? "#fecaca" : "#eee",
-                      transition: "all 0.3s",
-                    }}>
-                      {isDone ? (
-                        <CheckCircleOutlinedIcon sx={{ fontSize: 13, color: "#16a34a" }} />
-                      ) : isActive ? (
-                        <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1, repeat: Infinity }}>
-                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#ff2442" }} />
-                        </motion.div>
-                      ) : (
-                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#ddd" }} />
-                      )}
-                      <Typography sx={{
-                        fontSize: 12, fontWeight: isDone || isActive ? 600 : 400,
-                        color: isDone ? "#16a34a" : isActive ? "#ff2442" : "#bbb",
-                      }}>
-                        {agent.label}
-                      </Typography>
-                    </Box>
-                  </motion.div>
-                );
-              })}
-            </Box>
-
-            {/* Progress bar */}
-            <Box>
-              <Box sx={{ height: 6, bgcolor: "#f5f5f5", borderRadius: 3, overflow: "hidden", position: "relative" }}>
-                <Box sx={{
-                  height: "100%", borderRadius: 3, bgcolor: "#ff2442",
-                  width: `${progress}%`,
-                  transition: "width 0.5s ease",
-                  position: "relative",
-                  "&::after": {
-                    content: '""', position: "absolute", inset: 0,
-                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-                    animation: "shimmer 2s infinite",
-                  },
-                }} />
-              </Box>
-              <Typography sx={{ fontSize: 11, color: "#ccc", mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
-                {step + 1} / {STEPS.length}
+            <Box
+              onClick={() => setShowAnswer(true)}
+              sx={{
+                mt: 1.5, p: 1.5, borderRadius: "10px", cursor: "pointer",
+                bgcolor: showAnswer ? "#fff5f6" : "#f9f9f9",
+                border: showAnswer ? "1px solid #fecaca" : "1px solid transparent",
+                transition: "all 0.3s",
+              }}
+            >
+              <Typography sx={{ fontSize: 10, fontWeight: 700, color: showAnswer ? "#ff2442" : "#bbb", mb: 0.25 }}>
+                {showAnswer ? "答案" : "猜一猜"}
               </Typography>
+              <AnimatePresence mode="wait">
+                <motion.div key={`${factIdx}-${showAnswer}`}
+                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: showAnswer ? 700 : 500,
+                    color: showAnswer ? "#ff2442" : "#1a1a1a", lineHeight: 1.5 }}>
+                    {showAnswer ? FUN_FACTS[factIdx].a : FUN_FACTS[factIdx].q}
+                  </Typography>
+                </motion.div>
+              </AnimatePresence>
             </Box>
-
-            {/* ── Divider ── */}
-            <Box sx={{ height: 1, bgcolor: "#f0f0f0" }} />
-
-            {/* ══ 辩论阶段: 辩论实况占据主要空间 ══ */}
-            {step >= 8 ? (
-              <Box>
-                <Box sx={{
-                  p: { xs: 2, md: 2.5 }, borderRadius: "14px",
-                  bgcolor: "#fff", border: "1px solid #f0f0f0",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-                }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                    <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#ff2442",
-                      animation: debateMsgs.length < 4 ? "pulse 1.5s infinite" : "none" }} />
-                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#262626" }}>
-                      专家辩论实况
-                    </Typography>
-                    <Typography sx={{ fontSize: 11, color: "#bbb" }}>
-                      {debateMsgs.length}/4 位专家已发言
-                    </Typography>
-                  </Box>
-
-                  {debateMsgs.length === 0 ? (
-                    <Box sx={{ py: 3, textAlign: "center" }}>
-                      <Typography sx={{ fontSize: 13, color: "#bbb" }}>等待专家发言...</Typography>
-                    </Box>
-                  ) : (
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-                      {debateMsgs.map((msg, i) => {
-                        const names = ["内容专家", "视觉专家", "增长顾问", "用户模拟"];
-                        const colors = ["#ff2442", "#8b5cf6", "#f59e0b", "#3b82f6"];
-                        const bgColors = ["#fff5f6", "#faf5ff", "#fffbeb", "#eff6ff"];
-                        return (
-                          <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.4, delay: i * 0.1 }}>
-                            <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                              <Box sx={{
-                                width: 28, height: 28, borderRadius: "8px", flexShrink: 0, mt: 0.25,
-                                bgcolor: colors[i % 4],
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                              }}>
-                                <Typography sx={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>
-                                  {(names[i] || "?").charAt(0)}
-                                </Typography>
-                              </Box>
-                              <Box sx={{
-                                flex: 1, px: 1.5, py: 1,
-                                borderRadius: "4px 12px 12px 12px",
-                                bgcolor: bgColors[i % 4],
-                                border: `1px solid ${colors[i % 4]}15`,
-                              }}>
-                                <Typography sx={{ fontSize: 13, color: "#333", lineHeight: 1.65 }}>
-                                  {msg}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          </motion.div>
-                        );
-                      })}
-                    </Box>
-                  )}
-
-                  {step >= 9 && debateMsgs.length >= 4 && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-                      <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 0.75 }}>
-                        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#10b981" }} />
-                        <Typography sx={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>
-                          辩论完成，综合裁判正在评定最终报告...
-                        </Typography>
-                      </Box>
-                    </motion.div>
-                  )}
-                </Box>
-              </Box>
-            ) : (
-              <>
-                {/* ══ 非辩论阶段: Tips + Quiz ══ */}
-                <Box>
-                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#10b981", mb: 0.75, letterSpacing: "0.04em" }}>
-                    数据洞察
-                  </Typography>
-                  <AnimatePresence mode="wait">
-                    <motion.div key={tipIdx} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                      <Typography sx={{ fontSize: { xs: 13, md: 14 }, color: "#555", lineHeight: 1.7 }}>
-                        {tips[tipIdx]}
-                      </Typography>
-                    </motion.div>
-                  </AnimatePresence>
-                </Box>
-
-                <Box
-                  onClick={() => setShowAnswer(true)}
-                  sx={{
-                    p: 2, borderRadius: "14px", cursor: "pointer",
-                    bgcolor: showAnswer ? "#fff5f6" : "#f9f9f9",
-                    border: showAnswer ? "1px solid #fecaca" : "1px solid transparent",
-                    transition: "all 0.3s",
-                    "&:hover": { bgcolor: showAnswer ? "#fff5f6" : "#f5f5f5" },
-                  }}
-                >
-                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: showAnswer ? "#ff2442" : "#bbb", mb: 0.5, letterSpacing: "0.04em" }}>
-                    {showAnswer ? "答案揭晓" : "猜一猜"}
-                  </Typography>
-                  <AnimatePresence mode="wait">
-                    <motion.div key={`${factIdx}-${showAnswer}`}
-                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
-                      <Typography sx={{
-                        fontSize: { xs: 14, md: 15 }, fontWeight: showAnswer ? 700 : 500,
-                        color: showAnswer ? "#ff2442" : "#1a1a1a", lineHeight: 1.6,
-                      }}>
-                        {showAnswer ? FUN_FACTS[factIdx].a : FUN_FACTS[factIdx].q}
-                      </Typography>
-                    </motion.div>
-                  </AnimatePresence>
-                  {!showAnswer && (
-                    <Typography sx={{ fontSize: 11, color: "#ccc", mt: 0.5 }}>点击揭晓</Typography>
-                  )}
-                </Box>
-              </>
-            )}
           </Box>
         </Box>
       </Box>
