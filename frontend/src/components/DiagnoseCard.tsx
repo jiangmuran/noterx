@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Box, Typography, Button, Stack } from "@mui/material";
+import { Box, Typography, Button } from "@mui/material";
 import ShareIcon from "@mui/icons-material/Share";
 import html2canvas from "html2canvas";
 import type { DiagnoseResult } from "../utils/api";
@@ -28,15 +28,11 @@ export default function DiagnoseCard({ report, title }: Props) {
     try {
       const blob = await generateImage();
       if (!blob) return;
-
-      // Try native share first (mobile)
       if (navigator.share && navigator.canShare?.({ files: [new File([blob], "card.png", { type: "image/png" })] })) {
         const file = new File([blob], `薯医诊断-${title.slice(0, 10)}.png`, { type: "image/png" });
         await navigator.share({ files: [file], title: "薯医诊断卡片" });
         return;
       }
-
-      // Fallback: download
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = `薯医诊断-${title.slice(0, 10)}.png`;
@@ -50,13 +46,16 @@ export default function DiagnoseCard({ report, title }: Props) {
     }
   };
 
+  const radarLabels: Record<string, string> = {
+    content: "内容", visual: "视觉", growth: "增长",
+    user_reaction: "互动", overall: "综合",
+  };
+
   return (
     <Box>
       <Button
-        variant="outlined" fullWidth
-        startIcon={<ShareIcon />}
-        disabled={exporting}
-        onClick={handleExport}
+        variant="outlined" fullWidth startIcon={<ShareIcon />}
+        disabled={exporting} onClick={handleExport}
         sx={{
           py: 1.25, borderRadius: "12px", fontWeight: 700, fontSize: 14,
           color: "#262626", borderColor: "#e0e0e0",
@@ -66,94 +65,93 @@ export default function DiagnoseCard({ report, title }: Props) {
         {exporting ? "生成中..." : "分享诊断卡片"}
       </Button>
 
-      <Box
+      {/*
+        html2canvas 兼容卡片 — 避免 flexbox/gap/backdrop-filter
+        全部用 padding + text-align 布局
+      */}
+      <div
         ref={cardRef}
-        sx={{
-          mt: 2, border: "1px solid #f0f0f0", borderRadius: "16px",
-          overflow: "hidden", bgcolor: "#fff",
-          width: "100%", maxWidth: 360, mx: "auto",
+        style={{
+          marginTop: 16, borderRadius: 16, overflow: "hidden",
+          border: "1px solid #f0f0f0", backgroundColor: "#fff",
+          width: "100%", maxWidth: 340, marginLeft: "auto", marginRight: "auto",
         }}
       >
-        {/* Header gradient */}
-        <Box sx={{
+        {/* Header */}
+        <div style={{
           background: "linear-gradient(135deg, #ff3d5c, #e61e3d)",
-          px: 3, pt: 2.5, pb: 2, color: "#fff",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "20px 24px 16px",
+          color: "#fff",
+          position: "relative",
         }}>
-          <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 600, opacity: 0.8, mb: 0.25 }}>薯医诊断</Typography>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>
-              {title}
-            </Typography>
-          </Box>
-          <Box sx={{ textAlign: "center" }}>
-            <Typography sx={{ fontSize: 36, fontWeight: 900, lineHeight: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginBottom: 4 }}>薯医诊断</div>
+          <div style={{
+            fontSize: 13, fontWeight: 600, lineHeight: 1.4,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+            maxWidth: 200,
+          }}>
+            {title}
+          </div>
+          <div style={{
+            position: "absolute", right: 24, top: 16, textAlign: "center",
+          }}>
+            <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1 }}>
               {Math.round(report.overall_score)}
-            </Typography>
-            <Typography sx={{
+            </div>
+            <div style={{
               fontSize: 12, fontWeight: 700,
-              bgcolor: "rgba(255,255,255,0.2)", px: 1, py: 0.15,
-              borderRadius: "6px", mt: 0.25,
+              backgroundColor: "rgba(255,255,255,0.2)",
+              padding: "2px 8px", borderRadius: 6, marginTop: 4, display: "inline-block",
             }}>
               {report.grade}
-            </Typography>
-          </Box>
-        </Box>
+            </div>
+          </div>
+        </div>
 
-        {/* Radar data bars */}
-        <Box sx={{ px: 3, py: 2 }}>
-          {Object.entries(report.radar_data || {}).map(([key, val]) => {
-            const labels: Record<string, string> = {
-              content: "内容", visual: "视觉", growth: "增长",
-              user_reaction: "互动", overall: "综合",
-            };
-            return (
-              <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.5 }}>
-                <Typography sx={{ fontSize: 10, color: "#999", width: 28, textAlign: "right" }}>
-                  {labels[key] || key}
-                </Typography>
-                <Box sx={{ flex: 1, height: 4, bgcolor: "#f5f5f5", borderRadius: 2, overflow: "hidden" }}>
-                  <Box sx={{ height: "100%", bgcolor: "#ff2442", borderRadius: 2, width: `${val}%` }} />
-                </Box>
-                <Typography sx={{ fontSize: 10, fontWeight: 600, color: "#666", width: 20, textAlign: "right" }}>
-                  {Math.round(val as number)}
-                </Typography>
-              </Box>
-            );
-          })}
-        </Box>
+        {/* Bars */}
+        <div style={{ padding: "16px 24px" }}>
+          {Object.entries(report.radar_data || {}).map(([key, val]) => (
+            <div key={key} style={{ marginBottom: 6, display: "flex", alignItems: "center" }}>
+              <span style={{ fontSize: 10, color: "#999", width: 28, textAlign: "right" as const, marginRight: 8 }}>
+                {radarLabels[key] || key}
+              </span>
+              <div style={{ flex: 1, height: 4, backgroundColor: "#f5f5f5", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ height: "100%", backgroundColor: "#ff2442", borderRadius: 2, width: `${val}%` }} />
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "#666", width: 22, textAlign: "right" as const, marginLeft: 6 }}>
+                {Math.round(val as number)}
+              </span>
+            </div>
+          ))}
+        </div>
 
         {/* Issues */}
-        <Box sx={{ px: 3, py: 1.5, borderTop: "1px solid #f0f0f0" }}>
-          <Typography sx={{ fontSize: 10, fontWeight: 600, color: "#999", mb: 0.75 }}>主要发现</Typography>
-          <Stack spacing={0.3}>
-            {report.issues.slice(0, 3).map((issue, i) => (
-              <Typography key={i} sx={{ fontSize: 11, color: "#555", lineHeight: 1.5 }}>
-                {i + 1}. {typeof issue === "string" ? issue : issue.description}
-              </Typography>
-            ))}
-          </Stack>
-        </Box>
+        <div style={{ padding: "12px 24px", borderTop: "1px solid #f0f0f0" }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#999", marginBottom: 6 }}>主要发现</div>
+          {report.issues.slice(0, 3).map((issue, i) => (
+            <div key={i} style={{ fontSize: 11, color: "#555", lineHeight: 1.5, marginBottom: 2 }}>
+              {i + 1}. {typeof issue === "string" ? issue : issue.description}
+            </div>
+          ))}
+        </div>
 
-        {/* Footer with branding */}
-        <Box sx={{
-          px: 3, py: 1.5, bgcolor: "#fafafa", borderTop: "1px solid #f0f0f0",
+        {/* Footer */}
+        <div style={{
+          padding: "10px 24px", backgroundColor: "#fafafa",
+          borderTop: "1px solid #f0f0f0",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <Box sx={{
-              width: 16, height: 16, borderRadius: "4px",
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <div style={{
+              width: 14, height: 14, borderRadius: 3,
               background: "linear-gradient(135deg, #ff5c6f, #e61e3d)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Typography sx={{ color: "#fff", fontSize: 7, fontWeight: 800 }}>Rx</Typography>
-            </Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#262626" }}>薯医 NoteRx</Typography>
-          </Box>
-          <Typography sx={{ fontSize: 9, color: "#bbb" }}>noterx.muran.tech</Typography>
-        </Box>
-      </Box>
+              display: "inline-block", marginRight: 4, verticalAlign: "middle",
+            }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#262626" }}>薯医 NoteRx</span>
+          </div>
+          <span style={{ fontSize: 9, color: "#bbb" }}>noterx.muran.tech</span>
+        </div>
+      </div>
     </Box>
   );
 }

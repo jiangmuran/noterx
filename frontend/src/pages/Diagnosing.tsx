@@ -410,6 +410,23 @@ export default function Diagnosing() {
           {/* ═══ Right column: Progress + Engagement ═══ */}
           <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
 
+            {/* Note preview — 让用户等待时有东西看 */}
+            {(params.title || params.content) && (
+              <Box sx={{ px: 1.5, py: 1.25, borderRadius: "10px", bgcolor: "#f9f9f9", border: "1px solid #f0f0f0" }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#262626", lineHeight: 1.4, mb: params.content ? 0.5 : 0 }}>
+                  {params.title || "无标题"}
+                </Typography>
+                {params.content && (
+                  <Typography sx={{
+                    fontSize: 12, color: "#888", lineHeight: 1.5,
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  }}>
+                    {params.content}
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             {/* Current step */}
             <Box>
               <AnimatePresence mode="wait">
