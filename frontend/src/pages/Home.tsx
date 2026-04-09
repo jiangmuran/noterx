@@ -456,7 +456,7 @@ export default function Home() {
             display: { xs: "none", md: "block" },
             fontSize: 12, color: "#999", fontWeight: 500,
           }}>
-            AI 诊断你的小红书笔记 · 基于 874 条真实数据
+            AI 笔记诊断 · 大量真实数据训练
           </Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>

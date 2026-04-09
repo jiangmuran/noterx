@@ -21,7 +21,6 @@ export default function DiagnoseCard({ report, title }: Props) {
         scale: 3,
         backgroundColor: "#ffffff",
         useCORS: true,
-        width: 360,
       });
       const link = document.createElement("a");
       link.download = `薯医诊断-${title.slice(0, 10)}.png`;
@@ -55,7 +54,7 @@ export default function DiagnoseCard({ report, title }: Props) {
         sx={{
           mt: 2, border: "1px solid #f0f0f0", borderRadius: "16px",
           overflow: "hidden", bgcolor: "#fff",
-          width: 360, mx: "auto",
+          width: "100%", maxWidth: 360, mx: "auto",
         }}
       >
         {/* Header gradient */}
