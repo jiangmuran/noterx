@@ -402,7 +402,11 @@ export async function quickRecognizeVideo(file: File): Promise<QuickRecognizeRes
   const { data } = await api.post<QuickRecognizeResult>(
     "/screenshot/quick-recognize-video",
     fd,
-    { headers: { "Content-Type": "multipart/form-data" }, timeout: 180000 }
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+      /** 视频快识包含整段 STT，长视频可能需要数分钟 */
+      timeout: 600_000,
+    }
   );
   return data;
 }

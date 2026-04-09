@@ -18,6 +18,7 @@ from PIL import Image
 
 from app.agents.base_agent import _get_client, _is_mimo_openai_compat, _parse_json_from_llm_text
 from app.analysis.mimo_video import build_mimo_video_url_content_part
+from app.analysis.video_stt import transcribe_video_with_whisper
 from app.api.diagnose import (
     MAX_VIDEO_SIZE,
     MIME_TO_EXT,
@@ -412,11 +413,34 @@ def _content_text_looks_like_video_scene_caption(text: str) -> bool:
     return False
 
 
+def _strip_video_scene_caption_lines(text: str) -> str:
+    """
+    清除内容中的「画面描述型」旁白行，仅保留逐字字幕/口播文本。
+    """
+    s = str(text or "").strip()
+    if not s:
+        return ""
+
+    lines = [ln.strip() for ln in s.splitlines() if ln.strip()]
+    if not lines:
+        return ""
+
+    kept = [ln for ln in lines if not _content_text_looks_like_video_scene_caption(ln)]
+    if kept:
+        return "\n".join(kept).strip()
+    return ""
+
+
 def _sanitize_video_meta_narrative_content(result: dict) -> None:
-    """若正文被填成画面叙述而非字幕原文，清空 content_text，便于触发抽帧/OCR。"""
+    """
+    若正文混入画面叙述旁白，移除旁白行，仅保留逐字字幕/口播。
+    旧逻辑会整段清空，可能误伤已并入的 STT 正文。
+    """
     ct = str(result.get("content_text", "")).strip()
-    if ct and _content_text_looks_like_video_scene_caption(ct):
-        result["content_text"] = ""
+    if not ct:
+        return
+    cleaned = _strip_video_scene_caption_lines(ct)
+    result["content_text"] = cleaned
 
 
 def _normalize_quick_recognition_fields(
@@ -466,7 +490,7 @@ def _video_subtitle_payload_insufficient(result: dict) -> bool:
     视频快识：无可用字幕正文（含模型把画面说明误填进 content_text）时需抽帧或 OCR。
     """
     ct = str(result.get("content_text", "")).strip()
-    if ct and _content_text_looks_like_video_scene_caption(ct):
+    if ct and not _strip_video_scene_caption_lines(ct):
         return True
     return _quick_payload_is_empty(result)
 
@@ -528,6 +552,23 @@ def _merge_subtitle_transcript_into_result(result: dict, lines: list[str]) -> No
             len(prev),
             len(transcript),
         )
+
+
+def _merge_stt_into_video_result(result: dict, stt: str) -> None:
+    """将 Whisper 口播转写并入 content_text（与画面字幕互补）。"""
+    text = (stt or "").strip()
+    if not text:
+        return
+    prev_raw = str(result.get("content_text", "")).strip()
+    prev = _strip_video_scene_caption_lines(prev_raw)
+    if not prev:
+        result["content_text"] = text
+        return
+    if text in prev or prev in text:
+        if len(text) > len(prev):
+            result["content_text"] = text
+        return
+    result["content_text"] = f"{prev}\n\n{text}".strip()
 
 
 async def _video_url_quick_call(client, video_url: str) -> dict:
@@ -628,11 +669,40 @@ async def _video_url_subtitle_transcript_call(client, video_url: str) -> list[st
     return _parse_subtitle_lines_payload(parsed)
 
 
+def _video_title_body_same_short_hook(result: dict) -> bool:
+    """
+    标题与正文是否为同一句短花字（常见于视频首帧钩子），用于触发首帧 OCR 补全。
+    """
+    tt = str(result.get("title", "")).strip()
+    ct = str(result.get("content_text", "")).strip()
+    return bool(tt and ct and tt == ct and len(ct) <= 40)
+
+
+def _ocr_supplement_already_sufficient(title_text: str, content_text: str) -> bool:
+    """
+    判断快识是否已足够完整，可跳过首帧 OCR 补全。
+
+    视频场景里模型常把同一句花字同时填进标题与正文（如「注意看」），若二者非空即跳过 OCR，
+    则永远无法用首帧 OCR 拉长正文，口播 ASR 又失败时界面会一直只有三个字。
+    """
+    ct = (content_text or "").strip()
+    tt = (title_text or "").strip()
+    if not ct or not tt:
+        return False
+    if tt == ct and len(ct) <= 40:
+        return False
+    if len(ct) >= 52:
+        return True
+    if tt != ct and len(ct) >= 32:
+        return True
+    return False
+
+
 async def _ocr_supplement_quick_result(client, image_bytes: bytes, result: dict, ocr_cap: int) -> None:
-    """title/content 缺省时用 OCR 补全（与图片快识一致）。"""
+    """title/content 缺省或过短时用 OCR 补全（与图片快识一致）。"""
     content_text = str(result.get("content_text", "")).strip()
     title_text = str(result.get("title", "")).strip()
-    if content_text and title_text:
+    if _ocr_supplement_already_sufficient(title_text, content_text):
         return
     try:
         from app.analysis.ocr_processor import OCRProcessor
@@ -777,6 +847,8 @@ async def quick_recognize_video(request: Request, file: UploadFile = File(...)):
     quick_max_out = _quick_image_max_out_tokens()
     ocr_cap = _quick_ocr_max_tokens()
 
+    stt_task = asyncio.create_task(transcribe_video_with_whisper(video_bytes, container_ext))
+
     result: dict = {}
     video_url_mimo: Optional[str] = None
     url_diag = get_public_base_url_diagnostics(request)
@@ -851,10 +923,50 @@ async def quick_recognize_video(request: Request, file: UploadFile = File(...)):
         not str(result.get("title", "")).strip()
         or not str(result.get("content_text", "")).strip()
         or _content_text_looks_like_video_scene_caption(str(result.get("content_text", "")).strip())
+        or _video_title_body_same_short_hook(result)
     ):
         frame_jpeg = _extract_first_video_frame(video_bytes, container_ext)
     if frame_jpeg:
         await _ocr_supplement_quick_result(client, frame_jpeg, result, ocr_cap)
+
+    stt_text = ""
+    try:
+        _stt_t = float(os.getenv("VIDEO_STT_TIMEOUT_SEC", "240"))
+    except ValueError:
+        _stt_t = 240.0
+    stt_timeout = max(30.0, min(_stt_t, 600.0))
+    try:
+        stt_text = await asyncio.wait_for(stt_task, timeout=stt_timeout)
+    except asyncio.TimeoutError:
+        logger.warning("VIDEO_STT: Whisper 等待超时（%.0fs）", stt_timeout)
+        stt_task.cancel()
+        try:
+            await stt_task
+        except asyncio.CancelledError:
+            pass
+    except Exception as e:
+        logger.warning("VIDEO_STT: 合并前异常 %s", e)
+
+    _prev_ct_len = len(str(result.get("content_text", "") or ""))
+    _merge_stt_into_video_result(result, stt_text)
+    _after_ct_len = len(str(result.get("content_text", "") or ""))
+    logger.info(
+        "VIDEO_STT: 口播合并 prev_content_len=%s stt_len=%s merged_content_len=%s",
+        _prev_ct_len,
+        len((stt_text or "").strip()),
+        _after_ct_len,
+    )
+    _stt_env_on = os.getenv("VIDEO_STT_ENABLED", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if not (stt_text or "").strip() and _stt_env_on:
+        logger.warning(
+            "VIDEO_STT: 口播转写为空，正文仍主要来自视频模型/OCR；"
+            "请看上方 VIDEO_STT 日志（ffmpeg、API、代理已改为 trust_env=False 直连）",
+        )
 
     _sanitize_video_meta_narrative_content(result)
 
