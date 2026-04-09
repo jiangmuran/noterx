@@ -34,10 +34,6 @@ export default function DiagnoseCard({ report, title }: Props) {
     }
   };
 
-  const gradeColor: Record<string, string> = {
-    S: "#ea580c", A: "#16a34a", B: "#2563eb", C: "#d97706", D: "#dc2626",
-  };
-
   return (
     <Box>
       <Button
