@@ -493,7 +493,10 @@ export default function Home() {
     comments: "评论区",
   };
 
+  /** 所有素材的快识请求已结束（含全部失败） */
   const isReady = files.length > 0 && allRecognitionDone;
+  /** 至少有一条快识成功，才显示「分析完成」绿条，避免与「全部失败」红条同时出现 */
+  const hasRecogSuccess = successResults.length > 0;
   const [leaving, setLeaving] = useState(false);
 
   return (
@@ -596,9 +599,9 @@ export default function Home() {
               {files.length > 0 && (
                 <Chip size="small" label={`${files.length}/9`} sx={{
                   height: 22, fontSize: 10, fontWeight: 700,
-                  bgcolor: isReady ? "#f0fdf4" : "#eff6ff",
-                  color: isReady ? "#16a34a" : "#2563eb",
-                  border: isReady ? "1px solid #bbf7d0" : "1px solid #bfdbfe",
+                  bgcolor: isReady && hasRecogSuccess ? "#f0fdf4" : isReady ? "#fff7ed" : "#eff6ff",
+                  color: isReady && hasRecogSuccess ? "#16a34a" : isReady ? "#c2410c" : "#2563eb",
+                  border: isReady && hasRecogSuccess ? "1px solid #bbf7d0" : isReady ? "1px solid #fed7aa" : "1px solid #bfdbfe",
                 }} />
               )}
             </Box>
@@ -644,8 +647,8 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {/* Ready state */}
-            {isReady && files.length > 0 && (
+            {/* Ready state：仅在有成功识别时显示完成提示；全部失败只显示下方红字 */}
+            {isReady && files.length > 0 && hasRecogSuccess && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, px: 0.5 }}>
                 <CheckCircleIcon sx={{ fontSize: 13, color: "#16a34a" }} />
                 <Typography sx={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>分析完成，可以开始诊断</Typography>

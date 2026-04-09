@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Box, Typography, useTheme, useMediaQuery } from "@mui/material";
+import axios from "axios";
+import { Box, Typography, useTheme, useMediaQuery, Alert, Button } from "@mui/material";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
-import { preScore, diagnoseStream, diagnoseNote } from "../utils/api";
+import { preScore, diagnoseStream, diagnoseNote, DIAGNOSE_CLIENT_MAX_MS } from "../utils/api";
 import type { PreScoreResult, StreamEvent } from "../utils/api";
-import { FALLBACK_REPORT } from "../utils/fallback";
 
 /* ── Dimension labels ── */
 const DIM_LABELS: Record<string, string> = {
@@ -179,6 +179,10 @@ export default function Diagnosing() {
   const apiDone = useRef(false);
   const hasRealtimeProgress = useRef(false);
   const resultRef = useRef<{ report: unknown; isFallback: boolean } | null>(null);
+  /** 任意 SSE 事件刷新，用于检测「长时间无推送」卡死 */
+  const lastSseActivityRef = useRef<number>(Date.now());
+  const stallTriggeredRef = useRef(false);
+  const [terminalError, setTerminalError] = useState<string | null>(null);
 
   const tips = (params ? TIPS[params.category] : null) || TIPS._default;
 
@@ -199,6 +203,13 @@ export default function Diagnosing() {
       }
     }).catch(() => {});
 
+    /** 流式诊断结束后若仍为 false，再尝试 POST /diagnose */
+    let streamEndedWithServerError = false;
+
+    const touchSse = () => {
+      lastSseActivityRef.current = Date.now();
+    };
+
     // Phase 2: Full diagnosis via SSE stream (fallback to normal POST)
     (async () => {
       try {
@@ -212,6 +223,7 @@ export default function Diagnosing() {
           },
           (event: StreamEvent) => {
             if (cancelled) return;
+            touchSse();
             if (event.type === "pre_score") {
               setPreScoreData(event.data as unknown as PreScoreResult);
               setStep(1);
@@ -222,7 +234,6 @@ export default function Diagnosing() {
               if (mapped !== undefined) {
                 setStep((prev) => Math.max(prev, mapped));
               }
-              // Collect debate snippets for live display
               if (event.data.step?.startsWith("debate_agent_")) {
                 setDebateMsgs((prev) => [...prev, event.data.message]);
               }
@@ -230,13 +241,20 @@ export default function Diagnosing() {
               resultRef.current = { report: event.data, isFallback: false };
               apiDone.current = true;
             } else if (event.type === "error") {
-              console.warn("Stream error:", event.data.message);
+              streamEndedWithServerError = true;
+              const msg =
+                typeof event.data?.message === "string"
+                  ? event.data.message
+                  : "服务端诊断失败";
+              setTerminalError(msg);
+              apiDone.current = true;
             }
           },
         );
-        // SSE completed
+        if (streamEndedWithServerError) {
+          return;
+        }
         if (!resultRef.current) {
-          // Fallback to normal POST
           const result = await diagnoseNote({
             title: params.title, content: params.content,
             category: params.category, tags: params.tags,
@@ -257,12 +275,23 @@ export default function Diagnosing() {
             videoFile: params.videoFile ?? undefined,
           });
           resultRef.current = { report: result, isFallback: false };
-        } catch {
-          resultRef.current = { report: FALLBACK_REPORT, isFallback: true };
+        } catch (e2: unknown) {
+          let msg = "诊断请求失败，请检查网络与后端是否已启动";
+          if (axios.isAxiosError(e2)) {
+            const d = e2.response?.data;
+            if (d && typeof d === "object" && "detail" in d) {
+              const det = (d as { detail: unknown }).detail;
+              msg = typeof det === "string" ? det : JSON.stringify(det);
+            } else if (e2.message) {
+              msg = e2.message;
+            }
+          } else if (e2 instanceof Error && e2.message) {
+            msg = e2.message;
+          }
+          setTerminalError(msg);
         }
       }
       apiDone.current = true;
-
     })();
 
     // Step timer (fills gaps between real events)
@@ -287,19 +316,78 @@ export default function Diagnosing() {
     const clockTimer = setInterval(() => setElapsed((p) => p + 1), 1000);
     const factTimer = setInterval(() => { setFactIdx((p) => (p + 1) % FUN_FACTS.length); setShowAnswer(false); }, 8000);
 
-    // Timeout: 90s fallback
+    /**
+     * 整单最长等待；超时不再用演示数据，改为明确错误 + 重试。
+     */
     const timeoutTimer = setTimeout(() => {
       if (!apiDone.current && !cancelled) {
-        console.warn("诊断超时，使用 fallback");
-        resultRef.current = { report: FALLBACK_REPORT, isFallback: true };
+        setTerminalError(
+          `诊断超过 ${DIAGNOSE_CLIENT_MAX_MS / 1000}s 仍未结束。可在 frontend/.env 增大 VITE_DIAGNOSE_MAX_WAIT_MS，或检查后端/模型是否卡住。`,
+        );
         apiDone.current = true;
       }
-    }, 90000);
+    }, DIAGNOSE_CLIENT_MAX_MS);
 
-    return () => { cancelled = true; clearInterval(stepTimer); clearInterval(tipTimer); clearInterval(clockTimer); clearInterval(factTimer); clearTimeout(timeoutTimer); };
+    /** 长时间无任何 SSE 推送则判定连接卡死（默认 120s，每 10s 检查） */
+    const stallCheckMs = 120_000;
+    const stallIv = setInterval(() => {
+      if (cancelled || apiDone.current || stallTriggeredRef.current) return;
+      if (Date.now() - lastSseActivityRef.current > stallCheckMs) {
+        stallTriggeredRef.current = true;
+        setTerminalError(
+          "诊断流长时间无数据（可能后端或模型无响应）。请查看后端日志或稍后重试。",
+        );
+        apiDone.current = true;
+      }
+    }, 10_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(stepTimer);
+      clearInterval(tipTimer);
+      clearInterval(clockTimer);
+      clearInterval(factTimer);
+      clearInterval(stallIv);
+      clearTimeout(timeoutTimer);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!params) return null;
+
+  if (terminalError) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          bgcolor: "#faf9f7",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          px: 2,
+          gap: 2,
+        }}
+      >
+        <Alert severity="error" sx={{ maxWidth: 440, width: "100%", borderRadius: "12px" }}>
+          {terminalError}
+        </Alert>
+        <Button
+          variant="contained"
+          onClick={() => navigate("/app", { replace: true })}
+          sx={{
+            bgcolor: "#ff2442",
+            textTransform: "none",
+            fontWeight: 700,
+            px: 3,
+            borderRadius: "10px",
+            "&:hover": { bgcolor: "#e61e3d" },
+          }}
+        >
+          返回首页重试
+        </Button>
+      </Box>
+    );
+  }
 
   const progress = ((step + 1) / STEPS.length) * 100;
 

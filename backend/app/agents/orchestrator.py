@@ -178,6 +178,10 @@ class Orchestrator:
             except Exception as e:
                 logger.warning("progress callback failed (%s): %s", step, e)
 
+        agent_timeout = float(os.getenv("AGENT_LLM_TIMEOUT_SEC", "90"))
+        judge_timeout = float(os.getenv("JUDGE_LLM_TIMEOUT_SEC", "180"))
+        debate_timeout = float(os.getenv("DEBATE_LLM_TIMEOUT_SEC", "90"))
+
         # --- Step 1: 多模态内容解析 ---
         await _emit_progress("parse_start", "正在解析标题、正文与基础素材...")
         title_analysis = self.text_analyzer.analyze_title(title)
@@ -185,7 +189,13 @@ class Orchestrator:
 
         image_analysis = None
         if cover_image:
-            image_analysis = self.image_analyzer.analyze(cover_image)
+            image_analysis = await asyncio.to_thread(self.image_analyzer.analyze, cover_image)
+            logger.info(
+                "cover_image: bytes=%d cv_size=%sx%s",
+                len(cover_image),
+                image_analysis.get("width"),
+                image_analysis.get("height"),
+            )
 
         logger.info("解析耗时 %.1fs", time.time() - t0)
         await _emit_progress("parse_done", "内容与素材解析完成")
@@ -238,24 +248,47 @@ class Orchestrator:
         growth_agent = GrowthAgent(model=MODEL_PRO)
         user_sim_agent = UserSimAgent(model=MODEL_PRO)
 
+        async def _run_round1_agent(label: str, coro):
+            try:
+                return await asyncio.wait_for(coro, timeout=agent_timeout)
+            except asyncio.TimeoutError:
+                logger.warning("Round1 %s 超时 (%.0fs)", label, agent_timeout)
+                return Exception(f"{label} 调用超时（{int(agent_timeout)}s）")
+            except Exception as e:
+                logger.warning("Round1 %s 异常: %s", label, e)
+                return e
+
         round1_tasks = [
-            content_agent.diagnose(
-                title=title, content=content, category=category,
-                title_analysis=title_analysis, content_analysis=content_analysis,
-                baseline_comparison=baseline_comparison,
+            _run_round1_agent(
+                "内容分析师",
+                content_agent.diagnose(
+                    title=title, content=content, category=category,
+                    title_analysis=title_analysis, content_analysis=content_analysis,
+                    baseline_comparison=baseline_comparison,
+                ),
             ),
-            visual_agent.diagnose(
-                title=title, category=category,
-                image_analysis=image_analysis,
-                video_analysis=video_analysis,
-                baseline_comparison=baseline_comparison,
+            _run_round1_agent(
+                "视觉诊断师",
+                visual_agent.diagnose(
+                    title=title, category=category,
+                    image_analysis=image_analysis,
+                    video_analysis=video_analysis,
+                    baseline_comparison=baseline_comparison,
+                    cover_image_bytes=cover_image,
+                ),
             ),
-            growth_agent.diagnose(
-                title=title, content=content, category=category,
-                tags=tags, baseline_comparison=baseline_comparison,
+            _run_round1_agent(
+                "增长策略师",
+                growth_agent.diagnose(
+                    title=title, content=content, category=category,
+                    tags=tags, baseline_comparison=baseline_comparison,
+                ),
             ),
-            user_sim_agent.diagnose(
-                title=title, content=content, category=category, tags=tags,
+            _run_round1_agent(
+                "用户模拟器",
+                user_sim_agent.diagnose(
+                    title=title, content=content, category=category, tags=tags,
+                ),
             ),
         ]
 
@@ -310,7 +343,10 @@ class Orchestrator:
             nonlocal debate_records, debate_tokens
             try:
                 debate_records, debate_tokens = await self._run_debate(
-                    agent_opinions, agents_list, progress_cb=_emit_progress
+                    agent_opinions,
+                    agents_list,
+                    progress_cb=_emit_progress,
+                    debate_timeout_sec=debate_timeout,
                 )
             except Exception as e:
                 logger.warning("辩论异常: %s", e)
@@ -320,13 +356,27 @@ class Orchestrator:
             nonlocal final_report, judge_tokens
             await _emit_progress("judge_start", "综合裁判正在评定...")
             try:
-                result = await judge.diagnose(
-                    title=title, category=category,
-                    agent_opinions=agent_opinions, debate_records=None,
+                result = await asyncio.wait_for(
+                    judge.diagnose(
+                        title=title, category=category,
+                        agent_opinions=agent_opinions, debate_records=None,
+                    ),
+                    timeout=judge_timeout,
                 )
                 final_report = result
                 meta = final_report.pop("_meta", None)
                 judge_tokens = meta.get("total_tokens", 0) if meta else 0
+            except asyncio.TimeoutError:
+                logger.error("裁判超时 (%.0fs)", judge_timeout)
+                final_report = {
+                    "overall_score": 50, "grade": "C",
+                    "issues": [{
+                        "severity": "high",
+                        "description": f"综合裁判超时（{int(judge_timeout)}s）",
+                        "from_agent": "system",
+                    }],
+                    "suggestions": [], "debate_summary": "裁判超时，已使用占位结果",
+                }
             except Exception as e:
                 logger.error("裁判异常: %s", e)
                 final_report = {"overall_score": 50, "grade": "C", "issues": [{"severity": "high", "description": str(e), "from_agent": "system"}], "suggestions": [], "debate_summary": "裁判失败"}
@@ -358,8 +408,13 @@ class Orchestrator:
         result["model_a_pre_score"] = model_a_score
         return result
 
-    async def _run_debate(self, opinions: list[dict], agents: list,
-                          progress_cb=None) -> tuple[list[dict], int]:
+    async def _run_debate(
+        self,
+        opinions: list[dict],
+        agents: list,
+        progress_cb=None,
+        debate_timeout_sec: float = 90.0,
+    ) -> tuple[list[dict], int]:
         """辩论环节：4个Agent依次发言，每个完成后发送进度事件。"""
         agent_names = ["内容专家", "视觉专家", "增长顾问", "用户模拟"]
         debate_records = []
@@ -383,12 +438,33 @@ class Orchestrator:
                 agent_name=agent.agent_name, other_opinions=other_text,
             ))
 
-        # Run all 4 in parallel but emit progress as each completes
+        # Run all 4 in parallel but emit progress as each completes（单席超时避免整盘挂死）
         async def _single_debate(idx):
-            return idx, await agents[idx].call_llm(
-                prompts[idx], system_override=agents[idx].system_prompt,
-                model_override=MODEL_FAST, max_tokens=1024,
-            )
+            try:
+                result = await asyncio.wait_for(
+                    agents[idx].call_llm(
+                        prompts[idx], system_override=agents[idx].system_prompt,
+                        model_override=MODEL_FAST, max_tokens=1024,
+                    ),
+                    timeout=debate_timeout_sec,
+                )
+                return idx, result
+            except asyncio.TimeoutError:
+                logger.warning("辩论 agent[%d] 超时 (%.0fs)", idx, debate_timeout_sec)
+                return idx, {
+                    "agent_name": agents[idx].agent_name,
+                    "agreements": [],
+                    "disagreements": [f"该专家发言超时（{int(debate_timeout_sec)}s），已跳过"],
+                    "additions": [],
+                }
+            except Exception as e:
+                logger.warning("辩论 agent[%d] 失败: %s", idx, e)
+                return idx, {
+                    "agent_name": agents[idx].agent_name,
+                    "agreements": [],
+                    "disagreements": [str(e)],
+                    "additions": [],
+                }
 
         tasks = [asyncio.create_task(_single_debate(i)) for i in range(len(agents))]
         for coro in asyncio.as_completed(tasks):

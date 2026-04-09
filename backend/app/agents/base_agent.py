@@ -16,29 +16,33 @@ from dotenv import load_dotenv
 
 def _load_env_files() -> None:
     """
-    按优先级加载环境变量：
-    1) 仓库根目录 .env（推荐放真实密钥）
-    2) backend/.env
-    3) 当前工作目录及其父目录 .env（兼容不同启动方式）
-    先加载的值优先（override=False），避免被占位值覆盖。
+    仅从真实 `.env` 加载；**绝不**加载 `.env.example`（模板不含有效密钥，且不得参与 runtime）。
+
+    顺序与 override：
+    - 先读仓库根 `.env`（override=False，仅补齐尚未出现在进程环境中的键）。
+    - 再读 `backend/.env`（override=True），**以后者为准**，避免根目录误留空/占位 OPENAI_API_KEY 挡住 backend 里的真密钥。
+    - 最后读当前工作目录及其父目录的 `.env`（override=True，便于本地覆盖；路径去重）。
     """
     current = Path(__file__).resolve()
     backend_root = current.parents[2]
     repo_root = current.parents[3]
-    candidates = [
-        repo_root / ".env",
-        backend_root / ".env",
-        Path.cwd() / ".env",
-        Path.cwd().parent / ".env",
+    candidates: list[tuple[Path, bool]] = [
+        (repo_root / ".env", False),
+        (backend_root / ".env", True),
+        (Path.cwd() / ".env", True),
+        (Path.cwd().parent / ".env", True),
     ]
     seen: set[Path] = set()
-    for p in candidates:
+    for p, override in candidates:
+        if p.name == ".env.example":
+            continue
         rp = p.resolve()
         if rp in seen:
             continue
+        if not rp.is_file():
+            continue
         seen.add(rp)
-        if rp.exists():
-            load_dotenv(rp, override=False)
+        load_dotenv(rp, override=override)
 
 
 _load_env_files()
@@ -164,6 +168,28 @@ def _parse_json_from_llm_text(raw: Optional[str]) -> dict:
     raise json.JSONDecodeError("no valid json object in output", text, 0)
 
 
+def _bytes_to_image_data_url(image_bytes: bytes) -> str:
+    """
+    根据魔数选择 MIME，生成 OpenAI/MiMo 兼容的 data URL（多模态 image_url）。
+    """
+    import base64
+
+    if not image_bytes:
+        raise ValueError("image_bytes is empty")
+    b64 = base64.standard_b64encode(image_bytes).decode("ascii")
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        mime = "image/jpeg"
+    elif image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        mime = "image/png"
+    elif len(image_bytes) > 12 and image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        mime = "image/webp"
+    elif image_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        mime = "image/gif"
+    else:
+        mime = "image/jpeg"
+    return f"data:{mime};base64,{b64}"
+
+
 def _should_retry_openai_without_json_format(exc: BaseException) -> bool:
     """部分兼容网关不支持 response_format=json_object，可去掉后重试。"""
     msg = str(exc).lower()
@@ -276,35 +302,67 @@ class BaseAgent:
     async def call_llm_vision(
         self,
         text_message: str,
-        image_b64: str,
+        image_bytes: bytes,
         system_prompt: Optional[str] = None,
         max_tokens: int = 2000,
     ) -> dict:
-        """调用多模态模型分析图像"""
+        """
+        调用多模态模型（MODEL_OMNI）分析图像；image_bytes 须为 JPEG/PNG/WebP 等原始字节。
+        """
         sys_prompt = system_prompt or self.system_prompt
         mimo = _is_mimo_openai_compat()
         max_out = max_tokens or int(os.getenv("LLM_MAX_COMPLETION_TOKENS", "2048"))
-        kwargs: dict = {
-            "model": MODEL_OMNI,
-            "messages": [
-                {"role": "system", "content": sys_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": text_message},
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}},
-                    ],
-                },
-            ],
-            "temperature": float(os.getenv("LLM_TEMPERATURE", "0.7")),
-        }
-        if mimo:
-            kwargs["max_completion_tokens"] = max_out
-        else:
-            kwargs["max_tokens"] = max_out
+        skip_json_mode = os.getenv("LLM_SKIP_JSON_RESPONSE_FORMAT", "").strip() in ("1", "true", "yes")
+        temp = float(os.getenv("LLM_TEMPERATURE", "0"))
+        data_url = _bytes_to_image_data_url(image_bytes)
+
+        async def _create(with_json_object: bool):
+            kwargs: dict = {
+                "model": MODEL_OMNI,
+                "messages": [
+                    {"role": "system", "content": sys_prompt},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": text_message},
+                            {"type": "image_url", "image_url": {"url": data_url}},
+                        ],
+                    },
+                ],
+                "temperature": temp,
+            }
+            if mimo:
+                kwargs["max_completion_tokens"] = max_out
+            else:
+                kwargs["max_tokens"] = max_out
+            if with_json_object and not skip_json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            return await self.client.chat.completions.create(**kwargs)
+
+        response = None
+        last_err: Optional[BaseException] = None
+        attempts: list[bool] = []
+        if not skip_json_mode:
+            attempts.append(True)
+        attempts.append(False)
+
+        for use_json in attempts:
+            try:
+                response = await _create(with_json_object=use_json)
+                break
+            except Exception as e:
+                last_err = e
+                if use_json and _should_retry_openai_without_json_format(e):
+                    logger.info("多模态网关可能不支持 response_format=json_object，将不带该参数重试: %s", e)
+                    continue
+                logger.warning("多模态调用失败: %s", e)
+                return self._error_response(str(e))
+
+        if response is None:
+            return self._error_response(str(last_err) if last_err else "多模态 LLM 无响应")
+
         raw: Optional[str] = None
         try:
-            response = await self.client.chat.completions.create(**kwargs)
             raw = response.choices[0].message.content
             try:
                 result = json.loads((raw or "").strip())
@@ -325,7 +383,7 @@ class BaseAgent:
             logger.warning("多模态原始输出（非 JSON）: %s", (raw or "")[:800])
             return self._error_response("多模态模型返回了非 JSON 格式的内容")
         except Exception as e:
-            logger.warning("多模态调用失败: %s", e)
+            logger.warning("解析多模态响应失败: %s", e)
             return self._error_response(str(e))
 
     def _error_response(self, error_msg: str) -> dict:
@@ -334,7 +392,7 @@ class BaseAgent:
         if "invalid api key" in lower_msg or "invalid_key" in lower_msg or "401" in lower_msg:
             suggestions = [
                 "API Key 无效：请检查 OPENAI_API_KEY 是否正确、未过期，并确认与 OPENAI_BASE_URL 对应。",
-                "如果使用仓库根目录 .env 启动，请确认 backend/.env 里的占位值不会覆盖真实配置。",
+                "密钥以 `backend/.env`（及仓库根 `.env`）为准；请勿把 `.env.example` 当作配置源，模板中的占位值无效。",
             ]
         return {
             "agent_name": self.agent_name,

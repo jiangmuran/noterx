@@ -3,9 +3,18 @@
  */
 import axios from "axios";
 
+/**
+ * 完整诊断（多轮 Agent + 可选视频）耗时常达数分钟；须与 Diagnosing 页等待上限一致。
+ * 可在 frontend/.env 中设置 `VITE_DIAGNOSE_MAX_WAIT_MS`（毫秒）。
+ */
+export const DIAGNOSE_CLIENT_MAX_MS = (() => {
+  const n = Number(import.meta.env.VITE_DIAGNOSE_MAX_WAIT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 600_000;
+})();
+
 const api = axios.create({
   baseURL: "/api",
-  timeout: 120000,
+  timeout: 120_000,
 });
 
 export interface DiagnoseParams {
@@ -95,6 +104,7 @@ export async function diagnoseNote(
 
   const { data } = await api.post<DiagnoseResult>("/diagnose", formData, {
     headers: { "Content-Type": "multipart/form-data" },
+    timeout: DIAGNOSE_CLIENT_MAX_MS,
   });
   return data;
 }
@@ -152,25 +162,43 @@ export async function diagnoseStream(
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  /** 必须在多次 read() 之间保留：TCP 常把 `event:` 与 `data:` 拆到不同 chunk，重置会导致永远收不到 result */
+  let pendingEvent = "";
+
+  const processSseLines = (lines: string[]) => {
+    for (const line of lines) {
+      if (line.startsWith("event: ")) {
+        pendingEvent = line.slice(7).trim();
+      } else if (line.startsWith("data:") && pendingEvent) {
+        const payload = line.slice(5).trimStart();
+        try {
+          const data = JSON.parse(payload);
+          onEvent({ type: pendingEvent, data } as StreamEvent);
+        } catch (e) {
+          if (pendingEvent === "result") {
+            console.error(
+              "[diagnoseStream] result 的 data 行 JSON 解析失败（可能过大或截断）",
+              e,
+            );
+          }
+        }
+        pendingEvent = "";
+      }
+    }
+  };
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    let eventType = "";
-    for (const line of lines) {
-      if (line.startsWith("event: ")) {
-        eventType = line.slice(7).trim();
-      } else if (line.startsWith("data: ") && eventType) {
-        try {
-          const data = JSON.parse(line.slice(6));
-          onEvent({ type: eventType, data } as StreamEvent);
-        } catch { /* ignore parse errors */ }
-        eventType = "";
-      }
+    if (value) {
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      processSseLines(lines);
     }
+    if (done) break;
+  }
+  if (buffer.trim()) {
+    processSseLines(buffer.split("\n"));
   }
 }
 

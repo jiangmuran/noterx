@@ -5,10 +5,14 @@ Analyzes cover composition/color/attraction, and can fallback to video semantics
 from __future__ import annotations
 
 import json
+import logging
+import os
 
 from app.agents.base_agent import BaseAgent
 from app.agents.prompts.visual_agent import SYSTEM_PROMPT
 from app.agents.research_data import build_data_prompt_for_agent
+
+logger = logging.getLogger("noterx.visual_agent")
 
 
 class VisualAgent(BaseAgent):
@@ -78,7 +82,39 @@ class VisualAgent(BaseAgent):
         msg += build_data_prompt_for_agent("visual", category)
         return msg
 
-    async def diagnose(self, **kwargs) -> dict:
-        """Run visual diagnosis."""
-        msg = self.build_user_message(**kwargs)
+    async def diagnose(
+        self,
+        *,
+        title: str,
+        category: str,
+        image_analysis: dict | None,
+        baseline_comparison: dict,
+        video_analysis: dict | None = None,
+        cover_image_bytes: bytes | None = None,
+    ) -> dict:
+        """
+        视觉诊断：若有封面字节则走多模态（MODEL_OMNI）直接看图；否则纯文本推断。
+        """
+        msg = self.build_user_message(
+            title=title,
+            category=category,
+            image_analysis=image_analysis,
+            baseline_comparison=baseline_comparison,
+            video_analysis=video_analysis,
+        )
+        vision_tail = (
+            "\n\n## 任务说明\n"
+            "已附上笔记**封面图**。请直接观察画面中的主体、文字、色彩、构图、人物/产品与背景，"
+            "结合上文量化指标与 Baseline 输出严格 JSON；**reasoning 中必须引用你看到的具体画面元素**（如「左上角黄色大字」「中央人物半身」）。"
+        )
+        if cover_image_bytes:
+            try:
+                from app.analysis.image_vision_prep import jpeg_bytes_for_vision
+
+                jpeg = jpeg_bytes_for_vision(cover_image_bytes)
+                max_tok = int(os.getenv("VISUAL_AGENT_MAX_COMPLETION_TOKENS", "2500"))
+                return await self.call_llm_vision(msg + vision_tail, jpeg, max_tokens=max_tok)
+            except Exception as e:
+                logger.warning("封面多模态诊断失败，降级为纯文本: %s", e)
+                return await self.call_llm(msg)
         return await self.call_llm(msg)
