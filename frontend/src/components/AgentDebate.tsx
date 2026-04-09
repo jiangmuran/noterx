@@ -30,6 +30,7 @@ function agentInitial(name: string): string {
 
 export default function AgentDebate({ opinions, summary, timeline }: Props) {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [showAllTimeline, setShowAllTimeline] = useState(false);
 
   return (
     <Stack spacing={2}>
@@ -102,7 +103,7 @@ export default function AgentDebate({ opinions, summary, timeline }: Props) {
             辩论过程 · {timeline.length} 条
           </Typography>
           <Stack spacing={1}>
-            {timeline.map((entry, i) => {
+            {(showAllTimeline ? timeline : timeline.slice(0, 3)).map((entry, i) => {
               const kind = KIND_STYLE[entry.kind] || KIND_STYLE.add;
               const colors = AGENT_COLORS[entry.agent_name] || { accent: "#666", bg: "#f9f9f9", text: "#333" };
               return (
@@ -130,6 +131,12 @@ export default function AgentDebate({ opinions, summary, timeline }: Props) {
               );
             })}
           </Stack>
+          {timeline.length > 3 && (
+            <Typography onClick={() => setShowAllTimeline(!showAllTimeline)}
+              sx={{ fontSize: 12, color: "#999", mt: 1, cursor: "pointer", "&:hover": { color: "#262626" } }}>
+              {showAllTimeline ? "收起" : `展开全部 ${timeline.length} 条`}
+            </Typography>
+          )}
         </Box>
       )}
     </Stack>
