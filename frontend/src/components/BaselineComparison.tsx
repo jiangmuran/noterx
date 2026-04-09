@@ -31,23 +31,23 @@ export default function BaselineComparison({ category, userTitle, userTags }: Pr
         const stats = data.stats ?? data;
         const nextMetrics: Metric[] = [
           {
-            label: "鏍囬瀛楁暟",
+            label: "标题字数",
             userValue: userTitle.length,
             avgValue: Math.round(Number(stats.avg_title_length ?? 0)),
             viralValue: Math.round(Number(stats.viral_avg_title_length ?? 0)),
-            unit: "瀛?",
+            unit: "字",
           },
           {
-            label: "鏍囩鏁伴噺",
+            label: "标签数量",
             userValue: userTags.length,
             avgValue: Math.round(Number(stats.avg_tag_count ?? 0)),
-            unit: "涓?",
+            unit: "个",
           },
         ];
 
         if (stats.viral_rate !== undefined) {
           nextMetrics.push({
-            label: "鍨傜被鐖嗘鐜?",
+            label: "爆款率",
             userValue: 0,
             avgValue: Math.round(Number(stats.viral_rate) * 10) / 10,
             unit: "%",
@@ -80,10 +80,10 @@ export default function BaselineComparison({ category, userTitle, userTags }: Pr
             {metric.label}
           </Typography>
           <Stack spacing={0.75}>
-            <BarRow label="浣犵殑绗旇" value={metric.userValue} maxValue={maxValue} color="#ff2442" unit={metric.unit} />
-            <BarRow label="鍨傜被骞冲潎" value={metric.avgValue} maxValue={maxValue} color="#ddd" unit={metric.unit} />
+            <BarRow label="你的笔记" value={metric.userValue} maxValue={maxValue} color="#ff2442" unit={metric.unit} />
+            <BarRow label="垂类平均" value={metric.avgValue} maxValue={maxValue} color="#ddd" unit={metric.unit} />
             {metric.viralValue !== undefined && metric.viralValue > 0 && (
-              <BarRow label="鐖嗘骞冲潎" value={metric.viralValue} maxValue={maxValue} color="#f59e0b" unit={metric.unit} />
+              <BarRow label="爆款平均" value={metric.viralValue} maxValue={maxValue} color="#f59e0b" unit={metric.unit} />
             )}
           </Stack>
         </Box>

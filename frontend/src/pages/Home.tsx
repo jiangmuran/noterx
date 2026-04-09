@@ -22,6 +22,26 @@ function fileKey(file: File) {
   return `${file.name}_${file.size}_${file.lastModified}`;
 }
 
+function textLen(value?: string) {
+  return (value || "").trim().length;
+}
+
+function shouldRetryRecognize(result: QuickRecognizeResult) {
+  if (!result.success) return false;
+  if (textLen(result.title) === 0 && textLen(result.content_text) === 0) return true;
+  if (textLen(result.content_text) > 0 && textLen(result.content_text) < 40) return true;
+  return false;
+}
+
+function deriveTitleFromContent(contentText?: string) {
+  if (!contentText) return "";
+  const line = contentText
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .find((s) => s.length >= 8);
+  return (line || "").slice(0, 100);
+}
+
 const CAT_MAP: Record<string, string> = {
   food: "food",
   fashion: "fashion",
@@ -31,22 +51,22 @@ const CAT_MAP: Record<string, string> = {
   fitness: "fitness",
   lifestyle: "lifestyle",
   home: "home",
-  "缇庨": "food",
-  "绌挎惌": "fashion",
-  "绉戞妧": "tech",
-  "鏃呮父": "travel",
-  "缇庡": "beauty",
-  "鍋ヨ韩": "fitness",
-  "鐢熸椿": "lifestyle",
-  "瀹跺眳": "home",
+  美食: "food",
+  穿搭: "fashion",
+  科技: "tech",
+  旅游: "travel",
+  美妆: "beauty",
+  健身: "fitness",
+  生活: "lifestyle",
+  家居: "home",
 };
 
 const QUICK_RECOGNIZE_CONCURRENCY = 2;
 const SLOT_LABELS: Record<string, string> = {
-  cover: "灏侀潰",
-  content: "璇︽儏",
-  profile: "涓婚〉",
-  comments: "璇勮鍖?",
+  cover: "封面",
+  content: "详情",
+  profile: "主页",
+  comments: "评论区",
 };
 
 export default function Home() {
@@ -65,7 +85,7 @@ export default function Home() {
   const recognizeInFlightRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    document.title = "钖尰 NoteRx";
+    document.title = "薯医 NoteRx";
   }, []);
 
   const handleFilesChange = useCallback((nextFiles: File[]) => {
@@ -155,7 +175,28 @@ export default function Home() {
     setAiLoading((prev) => ({ ...prev, [key]: true }));
 
     try {
-      const result = await quickRecognize(file);
+      let result = await quickRecognize(file);
+
+      // 空结果或明显过短时，按正文截图重试一次，减少偶发识别抖动。
+      if (shouldRetryRecognize(result)) {
+        try {
+          const retried = await quickRecognize(file, "content");
+          const better =
+            textLen(retried.title) > textLen(result.title) ||
+            textLen(retried.content_text) > textLen(result.content_text);
+          if (better) result = retried;
+        } catch {
+          // ignore single retry failure
+        }
+      }
+
+      if (textLen(result.title) === 0 && textLen(result.content_text) > 0) {
+        const fallbackTitle = deriveTitleFromContent(result.content_text);
+        if (fallbackTitle) {
+          result = { ...result, title: fallbackTitle };
+        }
+      }
+
       setAiRecogs((prev) => ({ ...prev, [key]: result }));
     } catch {
       setAiRecogs((prev) => ({
@@ -165,7 +206,7 @@ export default function Home() {
           slot_type: "unknown",
           category: "",
           summary: "",
-          error: "璇嗗埆澶辫触",
+          error: "识别失败",
         },
       }));
     } finally {
@@ -224,7 +265,7 @@ export default function Home() {
   const processingStatus = useMemo(() => {
     if (files.length === 0) return null;
     if (pendingRecognition) {
-      return { tone: "info" as const, text: "AI 正在识别截图内容，请稍候..." };
+      return { tone: "info" as const, text: "AI 正在识别截图内容，请稍等..." };
     }
     if (allRecognitionDone) {
       return { tone: "success" as const, text: "素材已就绪，可以开始诊断。" };
@@ -288,7 +329,7 @@ export default function Home() {
         }}
       >
         <Box>
-          <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#262626" }}>钖尰 NoteRx</Typography>
+          <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#262626" }}>薯医 NoteRx</Typography>
           <Typography sx={{ fontSize: 12, color: "#999" }}>AI 诊断你的小红书笔记</Typography>
         </Box>
         <Button
@@ -296,7 +337,7 @@ export default function Home() {
           onClick={() => navigate("/history")}
           sx={{ color: "#666", fontSize: 13, fontWeight: 600 }}
         >
-          鍘嗗彶
+          历史
         </Button>
       </Box>
 

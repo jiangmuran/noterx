@@ -65,7 +65,7 @@ export default function Diagnosing() {
   const [fatalError, setFatalError] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = "诊断中 - 钖尰 NoteRx";
+    document.title = "诊断中 - 薯医 NoteRx";
     if (!params) navigate("/app");
   }, [navigate, params]);
 
