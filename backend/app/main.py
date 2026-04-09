@@ -111,6 +111,24 @@ async def serve_research():
         return FileResponse(RESEARCH_HTML, media_type="text/html")
     return {"error": "Research page not found"}
 
+# ── Legal pages ──
+TERMS_HTML = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "terms.html")
+PRIVACY_HTML = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "privacy.html")
+
+@app.get("/terms")
+async def serve_terms():
+    """服务条款"""
+    if os.path.isfile(TERMS_HTML):
+        return FileResponse(TERMS_HTML, media_type="text/html")
+    return {"error": "Terms page not found"}
+
+@app.get("/privacy")
+async def serve_privacy():
+    """隐私政策"""
+    if os.path.isfile(PRIVACY_HTML):
+        return FileResponse(PRIVACY_HTML, media_type="text/html")
+    return {"error": "Privacy page not found"}
+
 # ── SPA: product app at /app and sub-routes ──
 SPA_ROUTES = {"/app", "/diagnosing", "/report", "/history", "/screenshot"}
 
@@ -125,7 +143,7 @@ if os.path.isdir(FRONTEND_DIST):
             if (response.status_code == 404
                     and not path.startswith("/api")
                     and not path.startswith("/assets")
-                    and path not in ("/", "/research")
+                    and path not in ("/", "/research", "/terms", "/privacy")
                     and not path.startswith("/admin")):
                 return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
             return response

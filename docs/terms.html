@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>服务条款 — 薯医 NoteRx</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--red:#ff2442;--red-light:#fff0f2;--ink:#262626;--slate:#666;--muted:#999;--border:#f0f0f0;--bg:#fafafa}
+html{scroll-behavior:smooth}
+body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:#fff;color:var(--ink);line-height:1.8;-webkit-text-size-adjust:100%}
+.wrap{max-width:680px;margin:0 auto;padding:3rem 1.5rem 4rem}
+.back{display:inline-flex;align-items:center;gap:0.3rem;font-size:0.85rem;color:var(--muted);text-decoration:none;margin-bottom:2rem;transition:color 0.2s}
+.back:hover{color:var(--red)}
+.back svg{width:16px;height:16px}
+h1{font-size:1.8rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:0.3rem}
+.subtitle{font-size:0.85rem;color:var(--muted);margin-bottom:2.5rem}
+h2{font-size:1.1rem;font-weight:700;margin:2rem 0 0.6rem;padding-left:0.8rem;border-left:3px solid var(--red)}
+p,li{font-size:0.92rem;color:var(--slate);margin-bottom:0.5rem}
+ul{padding-left:1.4rem;margin-bottom:1rem}
+li{margin-bottom:0.3rem}
+.highlight{background:var(--red-light);border-radius:8px;padding:1rem 1.2rem;margin:1.5rem 0;font-size:0.9rem;color:var(--ink);line-height:1.7}
+.footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);text-align:center;font-size:0.8rem;color:var(--muted)}
+.footer a{color:var(--red);text-decoration:none;font-weight:600}
+.footer a:hover{text-decoration:underline}
+@media(max-width:600px){.wrap{padding:2rem 1rem 3rem}h1{font-size:1.5rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a href="/" class="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>返回首页</a>
+
+<h1>服务条款</h1>
+<p class="subtitle">薯医 NoteRx (noterx.muran.tech) &mdash; 最后更新：2026年4月</p>
+
+<h2>服务说明</h2>
+<p>薯医 NoteRx 是一个基于多Agent辩论架构的AI笔记诊断平台。用户提交小红书笔记（文字、截图或链接），由多个AI智能体从内容质量、视觉表现、增长潜力、用户感知等维度进行分析，并通过多轮辩论得出综合诊断报告。</p>
+<p>本平台旨在为内容创作者提供数据驱动的参考建议，帮助优化笔记质量。</p>
+
+<h2>用户责任</h2>
+<ul>
+  <li>用户上传的笔记内容应当合法合规，不得包含违反法律法规的信息。</li>
+  <li>用户不得上传侵犯他人知识产权、隐私权或其他合法权益的内容。</li>
+  <li>用户应对自己提交的内容承担全部责任。</li>
+</ul>
+
+<h2>免责声明</h2>
+<div class="highlight">
+  本平台提供的所有诊断报告、评分及建议均由AI自动生成，仅供参考，不构成任何运营承诺或效果保证。实际笔记表现受平台算法、时效性、用户群体等多种因素影响，请结合自身判断合理使用。
+</div>
+
+<h2>数据说明</h2>
+<p>诊断历史仅存储在您的本地浏览器（IndexedDB）中。服务端不保存任何个人数据，也不会将您提交的笔记内容用于模型训练或其他用途。</p>
+<p>您可以随时在浏览器中清除本地存储的诊断历史。</p>
+
+<h2>匿名使用数据</h2>
+<p>为了产品改进和服务优化，我们会记录以下匿名使用数据：</p>
+<ul>
+  <li>IP地址（不与个人身份关联）</li>
+  <li>诊断品类及Token消耗</li>
+  <li>诊断耗时</li>
+</ul>
+<p>上述数据仅用于统计分析和产品优化，不会用于识别个人身份。</p>
+
+<h2>知识产权</h2>
+<p>薯医 NoteRx 平台的技术架构、多Agent辩论系统、基准数据分析方法及相关代码归 PageOne 团队所有。用户生成的诊断报告内容可由用户自由使用。</p>
+
+<h2>适用法律</h2>
+<p>本服务条款的解释及争议解决适用中华人民共和国法律。</p>
+
+<div class="footer">
+  <p>&copy; 2026 PageOne 团队 &mdash; <a href="/">返回薯医首页</a> &middot; <a href="/privacy">隐私政策</a></p>
+</div>
+
+</div>
+</body>
+</html>

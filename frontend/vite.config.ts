@@ -16,6 +16,14 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
         },
+        '/terms': {
+          target,
+          changeOrigin: true,
+        },
+        '/privacy': {
+          target,
+          changeOrigin: true,
+        },
       },
     },
   }
