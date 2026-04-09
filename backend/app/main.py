@@ -38,6 +38,22 @@ def _ensure_history_table():
         CREATE INDEX IF NOT EXISTS idx_history_created
         ON diagnosis_history(created_at DESC)
     """)
+    # Usage tracking table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS usage_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT NOT NULL,
+            action TEXT NOT NULL DEFAULT 'diagnose',
+            title TEXT DEFAULT '',
+            category TEXT DEFAULT '',
+            total_tokens INTEGER DEFAULT 0,
+            duration_sec REAL DEFAULT 0,
+            status TEXT DEFAULT 'ok',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_log(created_at DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_usage_ip ON usage_log(ip)")
     conn.commit()
     conn.close()
     local_memory.ensure_memory_md()
@@ -63,13 +79,21 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[
+        "https://noterx.muran.tech",
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(api_router, prefix="/api")
+
+# Admin panel at /admin (no /api prefix)
+from app.api.admin_api import router as admin_router
+app.include_router(admin_router)
 
 # ── Landing page: research whitepaper at / ──
 RESEARCH_HTML = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "research_whitepaper.html")
@@ -91,6 +115,24 @@ async def serve_research():
         return FileResponse(RESEARCH_HTML, media_type="text/html")
     return {"error": "Research page not found"}
 
+# ── Legal pages ──
+TERMS_HTML = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "terms.html")
+PRIVACY_HTML = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "privacy.html")
+
+@app.get("/terms")
+async def serve_terms():
+    """服务条款"""
+    if os.path.isfile(TERMS_HTML):
+        return FileResponse(TERMS_HTML, media_type="text/html")
+    return {"error": "Terms page not found"}
+
+@app.get("/privacy")
+async def serve_privacy():
+    """隐私政策"""
+    if os.path.isfile(PRIVACY_HTML):
+        return FileResponse(PRIVACY_HTML, media_type="text/html")
+    return {"error": "Privacy page not found"}
+
 # ── SPA: product app at /app and sub-routes ──
 SPA_ROUTES = {"/app", "/diagnosing", "/report", "/history", "/screenshot"}
 
@@ -105,7 +147,8 @@ if os.path.isdir(FRONTEND_DIST):
             if (response.status_code == 404
                     and not path.startswith("/api")
                     and not path.startswith("/assets")
-                    and path not in ("/", "/research")):
+                    and path not in ("/", "/research", "/terms", "/privacy")
+                    and not path.startswith("/admin")):
                 return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
             return response
 

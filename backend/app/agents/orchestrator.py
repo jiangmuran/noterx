@@ -406,6 +406,10 @@ class Orchestrator:
             stable_scores=stable_scores,
         )
         result["model_a_pre_score"] = model_a_score
+        result["_usage"] = {
+            "total_tokens": round1_tokens + debate_tokens + judge_tokens,
+            "duration_sec": round(total_time, 1),
+        }
         return result
 
     async def _run_debate(

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>隐私政策 — 薯医 NoteRx</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--red:#ff2442;--red-light:#fff0f2;--ink:#262626;--slate:#666;--muted:#999;--border:#f0f0f0;--bg:#fafafa}
+html{scroll-behavior:smooth}
+body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:#fff;color:var(--ink);line-height:1.8;-webkit-text-size-adjust:100%}
+.wrap{max-width:680px;margin:0 auto;padding:3rem 1.5rem 4rem}
+.back{display:inline-flex;align-items:center;gap:0.3rem;font-size:0.85rem;color:var(--muted);text-decoration:none;margin-bottom:2rem;transition:color 0.2s}
+.back:hover{color:var(--red)}
+.back svg{width:16px;height:16px}
+h1{font-size:1.8rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:0.3rem}
+.subtitle{font-size:0.85rem;color:var(--muted);margin-bottom:2.5rem}
+h2{font-size:1.1rem;font-weight:700;margin:2rem 0 0.6rem;padding-left:0.8rem;border-left:3px solid var(--red)}
+p,li{font-size:0.92rem;color:var(--slate);margin-bottom:0.5rem}
+ul{padding-left:1.4rem;margin-bottom:1rem}
+li{margin-bottom:0.3rem}
+.highlight{background:var(--red-light);border-radius:8px;padding:1rem 1.2rem;margin:1.5rem 0;font-size:0.9rem;color:var(--ink);line-height:1.7}
+.footer{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);text-align:center;font-size:0.8rem;color:var(--muted)}
+.footer a{color:var(--red);text-decoration:none;font-weight:600}
+.footer a:hover{text-decoration:underline}
+@media(max-width:600px){.wrap{padding:2rem 1rem 3rem}h1{font-size:1.5rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a href="/" class="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>返回首页</a>
+
+<h1>隐私政策</h1>
+<p class="subtitle">薯医 NoteRx (noterx.muran.tech) &mdash; 最后更新：2026年4月</p>
+
+<h2>信息收集</h2>
+<p>您提交的笔记截图和文字内容仅用于实时AI分析，分析完成后不会保存在服务端。我们不会将您的笔记内容用于模型训练或向第三方出售。</p>
+
+<h2>本地存储</h2>
+<p>诊断历史存储在您浏览器的 IndexedDB 中，完全由您本地控制。您可以随时在浏览器设置中清除这些数据，服务端无法访问您的本地存储。</p>
+
+<h2>匿名数据</h2>
+<p>为优化产品体验，我们会收集以下匿名数据：</p>
+<ul>
+  <li>IP地址 — 用于区分访问来源，不关联个人身份</li>
+  <li>诊断品类 — 了解用户需求分布</li>
+  <li>Token消耗和诊断耗时 — 用于性能监控和成本优化</li>
+</ul>
+<div class="highlight">
+  以上数据均以匿名形式记录，无法追溯到具体个人。我们承诺不会将这些数据用于广告投放或个人画像分析。
+</div>
+
+<h2>第三方服务</h2>
+<p>本平台调用小米 MiMo API 进行AI分析。在诊断过程中，您的笔记内容会被传输至 MiMo API 进行处理，相关数据受小米隐私政策约束。除此之外，我们不会将您的数据分享给其他第三方。</p>
+
+<h2>Cookie</h2>
+<p>本平台不使用 Cookie。我们不追踪您的浏览行为，也不使用任何第三方追踪工具。</p>
+
+<h2>未成年人</h2>
+<p>薯医 NoteRx 由未成年人团队（PageOne）开发，我们欢迎所有年龄段的用户使用本平台。本平台不要求注册账号，不收集个人身份信息。</p>
+
+<h2>联系我们</h2>
+<p>如果您对隐私政策有任何疑问或建议，欢迎通过以下方式联系我们：</p>
+<p><a href="https://github.com/jiangmuran/noterx/issues" target="_blank" rel="noopener" style="color:var(--red);font-weight:600">GitHub Issues (github.com/jiangmuran/noterx/issues)</a></p>
+
+<div class="footer">
+  <p>&copy; 2026 PageOne 团队 &mdash; <a href="/">返回薯医首页</a> &middot; <a href="/terms">服务条款</a></p>
+</div>
+
+</div>
+</body>
+</html>

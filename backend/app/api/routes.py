@@ -22,6 +22,7 @@ async def api_health():
 router.include_router(diagnose_router, tags=["diagnose"])
 router.include_router(baseline_router, tags=["baseline"])
 router.include_router(comments_router, tags=["comments"])
-router.include_router(history_router, tags=["history"])
+# history_router disabled — #58 fix: history is local-only (IndexedDB), server endpoints were a data leak
+# router.include_router(history_router, tags=["history"])
 router.include_router(screenshot_router, tags=["screenshot"])
 router.include_router(optimize_router, tags=["optimize"])

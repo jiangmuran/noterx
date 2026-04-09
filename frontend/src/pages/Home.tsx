@@ -865,6 +865,28 @@ export default function Home() {
         )}
       </Box>
 
+      {/* ═══ Footer — legal links ═══ */}
+      <Box sx={{
+        display: { xs: "none", md: "flex" },
+        justifyContent: "center", alignItems: "center", gap: 1.5,
+        py: 0.8, flexShrink: 0,
+        borderTop: "1px solid #f0f0f0", bgcolor: "#fff",
+      }}>
+        <Typography
+          component="a" href="/terms"
+          sx={{ fontSize: 11, color: "#bbb", textDecoration: "none", "&:hover": { color: "#ff2442" } }}
+        >
+          服务条款
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: "#ddd" }}>|</Typography>
+        <Typography
+          component="a" href="/privacy"
+          sx={{ fontSize: 11, color: "#bbb", textDecoration: "none", "&:hover": { color: "#ff2442" } }}
+        >
+          隐私政策
+        </Typography>
+      </Box>
+
     </Box>
   );
 }
