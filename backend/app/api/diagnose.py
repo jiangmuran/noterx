@@ -452,14 +452,14 @@ async def diagnose_note(
         video_analysis=video_analysis,
     )
     # Log usage
-    _tokens = report.get("model_a_pre_score", {}).get("total_tokens", 0)
+    _usage = report.pop("_usage", {})
     log_usage(
         ip=get_client_ip(request),
         action="diagnose",
         title=title[:100],
         category=category,
-        total_tokens=_tokens,
-        duration_sec=_time.time() - _t0,
+        total_tokens=_usage.get("total_tokens", 0),
+        duration_sec=_usage.get("duration_sec", round(_time.time() - _t0, 1)),
     )
     return report
 
@@ -592,6 +592,17 @@ async def diagnose_stream(
                     cover_image=image_bytes,
                     video_analysis=video_analysis,
                     progress_cb=_progress,
+                )
+                # Log usage from stream endpoint
+                from app.api.usage_tracker import get_client_ip, log_usage
+                _usage = report.pop("_usage", {})
+                log_usage(
+                    ip=get_client_ip(request),
+                    action="diagnose-stream",
+                    title=title[:100],
+                    category=category,
+                    total_tokens=_usage.get("total_tokens", 0),
+                    duration_sec=_usage.get("duration_sec", 0),
                 )
                 await queue.put(("result", report))
             except Exception as e:
