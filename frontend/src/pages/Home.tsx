@@ -35,7 +35,7 @@ const CAT_MAP: Record<string, string> = {
 };
 
 /** 快识并行路数 */
-const QUICK_RECOGNIZE_CONCURRENCY = 3;
+const QUICK_RECOGNIZE_CONCURRENCY = 10;
 
 /** 分析中轮播文案 */
 const ANALYSIS_MESSAGES = [
@@ -46,6 +46,49 @@ const ANALYSIS_MESSAGES = [
   "正在比对同类笔记数据...",
   "正在评估互动潜力...",
 ];
+
+/** 平滑进度条：匀速前进到90%，每完成一张跳到真实进度，全部完成到100% */
+function SmoothProgressBar({ done, total }: { done: number; total: number }) {
+  const [smooth, setSmooth] = useState(0);
+  const realPct = total === 0 ? 0 : (done / total) * 100;
+  const targetRef = useRef(realPct);
+  targetRef.current = realPct;
+
+  useEffect(() => {
+    // Tick every 200ms, creep toward 90% slowly, jump to real when real > smooth
+    const timer = setInterval(() => {
+      setSmooth((prev) => {
+        const target = targetRef.current;
+        if (target >= 100) return 100;
+        if (target > prev) return target; // real progress jumped ahead, snap to it
+        if (prev >= 90) return prev; // cap fake progress at 90%
+        return prev + 0.8; // creep ~4%/sec
+      });
+    }, 200);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Snap to 100 when all done
+  useEffect(() => {
+    if (realPct >= 100) setSmooth(100);
+  }, [realPct]);
+
+  return (
+    <Box sx={{ height: 3, bgcolor: "#f0f0f0", borderRadius: 2, overflow: "hidden" }}>
+      <Box sx={{
+        height: "100%", borderRadius: 2, bgcolor: "#ff2442",
+        width: `${Math.min(smooth, 100)}%`,
+        transition: "width 0.3s ease",
+        position: "relative",
+        "&::after": {
+          content: '""', position: "absolute", inset: 0,
+          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+          animation: "shimmer 2s infinite",
+        },
+      }} />
+    </Box>
+  );
+}
 
 function AnalysisStatusText() {
   const [idx, setIdx] = useState(0);
@@ -581,7 +624,7 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {/* AI analysis progress bar */}
+            {/* AI analysis progress bar — smooth */}
             <AnimatePresence>
               {(anyLoading || pendingRecognition) && files.length > 0 && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
@@ -591,22 +634,10 @@ export default function Home() {
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
                       <AnalysisStatusText />
                       <Typography sx={{ fontSize: 10, color: "#ccc", fontVariantNumeric: "tabular-nums" }}>
-                        {Object.keys(aiRecogs).length}/{files.filter(f => f.type.startsWith("image/")).length}
+                        {Object.keys(aiRecogs).length}/{imageFileKeys.size}
                       </Typography>
                     </Box>
-                    <Box sx={{ height: 3, bgcolor: "#f0f0f0", borderRadius: 2, overflow: "hidden" }}>
-                      <Box sx={{
-                        height: "100%", borderRadius: 2, bgcolor: "#ff2442",
-                        width: `${imageFileKeys.size === 0 ? 0 : (Object.keys(aiRecogs).length / imageFileKeys.size) * 100}%`,
-                        transition: "width 0.5s ease",
-                        position: "relative",
-                        "&::after": {
-                          content: '""', position: "absolute", inset: 0,
-                          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-                          animation: "shimmer 2s infinite",
-                        },
-                      }} />
-                    </Box>
+                    <SmoothProgressBar done={Object.keys(aiRecogs).length} total={imageFileKeys.size} />
                   </Box>
                 </motion.div>
               )}
