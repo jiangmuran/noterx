@@ -519,85 +519,125 @@ export default function Diagnosing() {
             {/* ── Divider ── */}
             <Box sx={{ height: 1, bgcolor: "#f0f0f0" }} />
 
-            {/* Live debate feed */}
-            <AnimatePresence>
-              {debateMsgs.length > 0 && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-                  transition={{ duration: 0.3 }}>
-                  <Box>
-                    <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#ff2442", mb: 1, letterSpacing: "0.04em" }}>
+            {/* ══ 辩论阶段: 辩论实况占据主要空间 ══ */}
+            {step >= 8 ? (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+                <Box sx={{
+                  p: { xs: 2, md: 2.5 }, borderRadius: "14px",
+                  bgcolor: "#fff", border: "1px solid #f0f0f0",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                    <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#ff2442",
+                      animation: debateMsgs.length < 4 ? "pulse 1.5s infinite" : "none" }} />
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#262626" }}>
                       专家辩论实况
                     </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                    <Typography sx={{ fontSize: 11, color: "#bbb" }}>
+                      {debateMsgs.length}/4 位专家已发言
+                    </Typography>
+                  </Box>
+
+                  {debateMsgs.length === 0 ? (
+                    <Box sx={{ py: 3, textAlign: "center" }}>
+                      <Typography sx={{ fontSize: 13, color: "#bbb" }}>等待专家发言...</Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
                       {debateMsgs.map((msg, i) => {
+                        const names = ["内容专家", "视觉专家", "增长顾问", "用户模拟"];
                         const colors = ["#ff2442", "#8b5cf6", "#f59e0b", "#3b82f6"];
                         const bgColors = ["#fff5f6", "#faf5ff", "#fffbeb", "#eff6ff"];
                         return (
-                          <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.3, delay: i * 0.05 }}>
-                            <Box sx={{
-                              px: 1.25, py: 0.75, borderRadius: "8px",
-                              bgcolor: bgColors[i % 4],
-                              borderLeft: `2px solid ${colors[i % 4]}`,
-                            }}>
-                              <Typography sx={{ fontSize: 12, color: "#444", lineHeight: 1.5 }}>
-                                {msg}
-                              </Typography>
+                          <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4, delay: i * 0.1 }}>
+                            <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                              <Box sx={{
+                                width: 28, height: 28, borderRadius: "8px", flexShrink: 0, mt: 0.25,
+                                bgcolor: colors[i % 4],
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}>
+                                <Typography sx={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>
+                                  {(names[i] || "?").charAt(0)}
+                                </Typography>
+                              </Box>
+                              <Box sx={{
+                                flex: 1, px: 1.5, py: 1,
+                                borderRadius: "4px 12px 12px 12px",
+                                bgcolor: bgColors[i % 4],
+                                border: `1px solid ${colors[i % 4]}15`,
+                              }}>
+                                <Typography sx={{ fontSize: 13, color: "#333", lineHeight: 1.65 }}>
+                                  {msg}
+                                </Typography>
+                              </Box>
                             </Box>
                           </motion.div>
                         );
                       })}
                     </Box>
-                  </Box>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  )}
 
-            {/* Tips */}
-            <Box>
-              <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#10b981", mb: 0.75, letterSpacing: "0.04em" }}>
-                数据洞察
-              </Typography>
-              <AnimatePresence mode="wait">
-                <motion.div key={tipIdx} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                  <Typography sx={{ fontSize: { xs: 13, md: 14 }, color: "#555", lineHeight: 1.7 }}>
-                    {tips[tipIdx]}
+                  {step >= 9 && debateMsgs.length >= 4 && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
+                      <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: 0.75 }}>
+                        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#10b981" }} />
+                        <Typography sx={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>
+                          辩论完成，综合裁判正在评定最终报告...
+                        </Typography>
+                      </Box>
+                    </motion.div>
+                  )}
+                </Box>
+              </motion.div>
+            ) : (
+              <>
+                {/* ══ 非辩论阶段: Tips + Quiz ══ */}
+                <Box>
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#10b981", mb: 0.75, letterSpacing: "0.04em" }}>
+                    数据洞察
                   </Typography>
-                </motion.div>
-              </AnimatePresence>
-            </Box>
+                  <AnimatePresence mode="wait">
+                    <motion.div key={tipIdx} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                      <Typography sx={{ fontSize: { xs: 13, md: 14 }, color: "#555", lineHeight: 1.7 }}>
+                        {tips[tipIdx]}
+                      </Typography>
+                    </motion.div>
+                  </AnimatePresence>
+                </Box>
 
-            {/* Quiz */}
-            <Box
-              onClick={() => setShowAnswer(true)}
-              sx={{
-                p: 2, borderRadius: "14px", cursor: "pointer",
-                bgcolor: showAnswer ? "#fff5f6" : "#f9f9f9",
-                border: showAnswer ? "1px solid #fecaca" : "1px solid transparent",
-                transition: "all 0.3s",
-                "&:hover": { bgcolor: showAnswer ? "#fff5f6" : "#f5f5f5" },
-              }}
-            >
-              <Typography sx={{ fontSize: 11, fontWeight: 700, color: showAnswer ? "#ff2442" : "#bbb", mb: 0.5, letterSpacing: "0.04em" }}>
-                {showAnswer ? "答案揭晓" : "猜一猜"}
-              </Typography>
-              <AnimatePresence mode="wait">
-                <motion.div key={`${factIdx}-${showAnswer}`}
-                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
-                  <Typography sx={{
-                    fontSize: { xs: 14, md: 15 }, fontWeight: showAnswer ? 700 : 500,
-                    color: showAnswer ? "#ff2442" : "#1a1a1a", lineHeight: 1.6,
-                  }}>
-                    {showAnswer ? FUN_FACTS[factIdx].a : FUN_FACTS[factIdx].q}
+                <Box
+                  onClick={() => setShowAnswer(true)}
+                  sx={{
+                    p: 2, borderRadius: "14px", cursor: "pointer",
+                    bgcolor: showAnswer ? "#fff5f6" : "#f9f9f9",
+                    border: showAnswer ? "1px solid #fecaca" : "1px solid transparent",
+                    transition: "all 0.3s",
+                    "&:hover": { bgcolor: showAnswer ? "#fff5f6" : "#f5f5f5" },
+                  }}
+                >
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: showAnswer ? "#ff2442" : "#bbb", mb: 0.5, letterSpacing: "0.04em" }}>
+                    {showAnswer ? "答案揭晓" : "猜一猜"}
                   </Typography>
-                </motion.div>
-              </AnimatePresence>
-              {!showAnswer && (
-                <Typography sx={{ fontSize: 11, color: "#ccc", mt: 0.5 }}>点击揭晓</Typography>
-              )}
-            </Box>
+                  <AnimatePresence mode="wait">
+                    <motion.div key={`${factIdx}-${showAnswer}`}
+                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
+                      <Typography sx={{
+                        fontSize: { xs: 14, md: 15 }, fontWeight: showAnswer ? 700 : 500,
+                        color: showAnswer ? "#ff2442" : "#1a1a1a", lineHeight: 1.6,
+                      }}>
+                        {showAnswer ? FUN_FACTS[factIdx].a : FUN_FACTS[factIdx].q}
+                      </Typography>
+                    </motion.div>
+                  </AnimatePresence>
+                  {!showAnswer && (
+                    <Typography sx={{ fontSize: 11, color: "#ccc", mt: 0.5 }}>点击揭晓</Typography>
+                  )}
+                </Box>
+              </>
+            )}
           </Box>
         </Box>
       </Box>
