@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Box, Typography, Button } from "@mui/material";
+import { Box, Button } from "@mui/material";
 import ShareIcon from "@mui/icons-material/Share";
 import html2canvas from "html2canvas";
 import type { DiagnoseResult } from "../utils/api";
