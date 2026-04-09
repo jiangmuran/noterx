@@ -72,7 +72,9 @@ def _build_stable_scores(
     else:
         visual_score = _clamp_score(visual_quality)
 
-    growth_score = _clamp_score(tag_strategy * 0.55 + engagement_potential * 0.45)
+    # Growth不应只看标签，engagement_potential(互动潜力)权重提高
+    # 好内容本身就有增长潜力，标签只是锦上添花
+    growth_score = _clamp_score(tag_strategy * 0.35 + engagement_potential * 0.45 + content_quality * 0.20)
     user_reaction_score = _clamp_score(
         content_score * 0.35 + visual_score * 0.2 + growth_score * 0.45
     )
