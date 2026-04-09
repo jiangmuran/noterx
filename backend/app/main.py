@@ -71,6 +71,10 @@ app.add_middleware(
 
 app.include_router(api_router, prefix="/api")
 
+# Admin panel at /admin (no /api prefix)
+from app.api.admin_api import router as admin_router
+app.include_router(admin_router)
+
 # ── Landing page: research whitepaper at / ──
 RESEARCH_HTML = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "research_whitepaper.html")
 
@@ -105,7 +109,8 @@ if os.path.isdir(FRONTEND_DIST):
             if (response.status_code == 404
                     and not path.startswith("/api")
                     and not path.startswith("/assets")
-                    and path not in ("/", "/research")):
+                    and path not in ("/", "/research")
+                    and not path.startswith("/admin")):
                 return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
             return response
 
