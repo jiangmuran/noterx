@@ -86,8 +86,20 @@ export default function SimulatedComments({ comments: initial, noteTitle = "", n
 
   if (!comments.length) return <Typography sx={{ fontSize: 14, color: "#999" }}>暂无模拟评论</Typography>;
 
+  const totalLikes = comments.reduce((sum, c) => sum + (c._likes || 0), 0);
+
   return (
     <Box>
+      {/* AI 预估摘要 */}
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, pb: 1, borderBottom: "1px solid #f0f0f0" }}>
+        <Typography sx={{ fontSize: 11, color: "#999" }}>
+          AI 模拟 {comments.length} 条评论
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: "#ff2442", fontWeight: 600 }}>
+          预估总赞 {totalLikes.toLocaleString()}
+        </Typography>
+      </Box>
+
       {comments.map((c, i) => (
         <Box key={`${c.username}-${i}`} sx={{ py: 1.25, borderBottom: "1px solid #f5f5f5", "&:last-child": { borderBottom: "none" } }}>
           {/* Main comment */}
@@ -203,7 +215,7 @@ export default function SimulatedComments({ comments: initial, noteTitle = "", n
           disabled={loading} onClick={handleLoadMore}
           sx={{ color: "#999", fontSize: 12, fontWeight: 500, borderRadius: "8px", "&:hover": { color: "#262626", bgcolor: "#f5f5f5" } }}
         >
-          {loading ? "生成中..." : "换一批评论"}
+          {loading ? "生成中..." : "加载更多"}
         </Button>
       </Box>
     </Box>
