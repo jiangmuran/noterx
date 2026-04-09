@@ -190,6 +190,7 @@ export default function Diagnosing() {
     document.title = "诊断中... - 薯医 NoteRx";
     if (!params) { navigate("/app"); return; }
     let cancelled = false;
+    const abortController = new AbortController();
 
     // Phase 1: Instant pre-score
     preScore({
@@ -250,6 +251,7 @@ export default function Diagnosing() {
               apiDone.current = true;
             }
           },
+          abortController.signal,
         );
         if (streamEndedWithServerError) {
           return;
@@ -343,6 +345,7 @@ export default function Diagnosing() {
 
     return () => {
       cancelled = true;
+      abortController.abort(); // 取消 SSE / fetch，与离开页卸载一致
       clearInterval(stepTimer);
       clearInterval(tipTimer);
       clearInterval(clockTimer);
@@ -439,47 +442,53 @@ export default function Diagnosing() {
 
           {/* ═══ Left column: Score ═══ */}
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-            {/* Score ring or placeholder */}
-            <AnimatePresence mode="wait">
-              {preScoreData ? (
-                <motion.div key="ring" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.6 }}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
-                >
-                  <ScoreRing score={preScoreData.total_score} size={isDesktop ? 140 : 110} />
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", justifyContent: "center" }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                      {preScoreData.category_cn}品类
+            {/* Score ring or placeholder — no mode="wait" to avoid flash */}
+            {preScoreData ? (
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
+              >
+                <ScoreRing score={preScoreData.total_score} size={isDesktop ? 140 : 110} />
+                <Box sx={{ textAlign: "center" }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", mb: 0.25,
+                    maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {params.title || "未命名笔记"}
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, justifyContent: "center" }}>
+                    <Typography sx={{ fontSize: 11, color: "#999" }}>
+                      {preScoreData.category_cn}
                     </Typography>
                     <Box sx={{
-                      px: 0.75, py: 0.2, borderRadius: "6px",
+                      px: 0.5, py: 0.1, borderRadius: "4px",
                       bgcolor: preScoreData.total_score >= 85 ? "#dcfce7" : preScoreData.total_score >= 70 ? "#fef3c7" : "#fee2e2",
                     }}>
                       <Typography sx={{
-                        fontSize: 11, fontWeight: 700,
+                        fontSize: 10, fontWeight: 700,
                         color: preScoreData.total_score >= 85 ? "#16a34a" : preScoreData.total_score >= 70 ? "#d97706" : "#dc2626",
                       }}>
                         {preScoreData.level}
                       </Typography>
                     </Box>
                   </Box>
+                </Box>
+              </motion.div>
+            ) : (
+              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                <motion.div animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 2, repeat: Infinity }}>
+                  <Box sx={{
+                    width: isDesktop ? 140 : 110, height: isDesktop ? 140 : 110,
+                    borderRadius: "50%", border: "3px solid #f0f0f0",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Typography sx={{ fontSize: 14, color: "#ccc", fontWeight: 600 }}>评分中</Typography>
+                  </Box>
                 </motion.div>
-              ) : (
-                <motion.div key="ph" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
-                >
-                  <motion.div animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 2, repeat: Infinity }}>
-                    <Box sx={{
-                      width: isDesktop ? 140 : 110, height: isDesktop ? 140 : 110,
-                      borderRadius: "50%", border: "3px solid #f0f0f0",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      <Typography sx={{ fontSize: 14, color: "#ccc", fontWeight: 600 }}>评分中</Typography>
-                    </Box>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#999",
+                  maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
+                  {params.title || "正在分析..."}
+                </Typography>
+              </Box>
+            )}
 
             {/* Dimension bars — desktop: always show; mobile: only when data ready */}
             {preScoreData && (
@@ -609,7 +618,7 @@ export default function Diagnosing() {
 
             {/* ══ 辩论阶段: 辩论实况占据主要空间 ══ */}
             {step >= 8 ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+              <Box>
                 <Box sx={{
                   p: { xs: 2, md: 2.5 }, borderRadius: "14px",
                   bgcolor: "#fff", border: "1px solid #f0f0f0",
@@ -677,7 +686,7 @@ export default function Diagnosing() {
                     </motion.div>
                   )}
                 </Box>
-              </motion.div>
+              </Box>
             ) : (
               <>
                 {/* ══ 非辩论阶段: Tips + Quiz ══ */}

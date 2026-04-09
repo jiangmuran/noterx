@@ -9,7 +9,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ReplayIcon from "@mui/icons-material/Replay";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { motion } from "framer-motion";
-import type { DiagnoseResult, PreScoreResult, OptimizePlan } from "../utils/api";
+import type { DiagnoseResult, OptimizePlan } from "../utils/api";
 import { preScore, optimizeDiagnosis } from "../utils/api";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import StarIcon from "@mui/icons-material/Star";

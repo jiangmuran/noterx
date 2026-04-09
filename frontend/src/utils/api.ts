@@ -147,6 +147,7 @@ export type StreamEvent =
 export async function diagnoseStream(
   params: DiagnoseParams,
   onEvent: (event: StreamEvent) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const fd = new FormData();
   fd.append("title", params.title);
@@ -157,7 +158,7 @@ export async function diagnoseStream(
   if (params.coverImages) params.coverImages.forEach((f) => fd.append("cover_images", f));
   if (params.videoFile) fd.append("video_file", params.videoFile);
 
-  const response = await fetch("/api/diagnose-stream", { method: "POST", body: fd });
+  const response = await fetch("/api/diagnose-stream", { method: "POST", body: fd, signal });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
@@ -330,6 +331,7 @@ export interface QuickRecognizeResult {
   summary: string;
   confidence?: number;
   error?: string;
+  publisher?: { name: string; follower_count: string };
   engagement_signal?: {
     likes_visible: number;
     collects_visible: number;

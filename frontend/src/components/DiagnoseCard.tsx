@@ -77,35 +77,35 @@ export default function DiagnoseCard({ report, title }: Props) {
           width: "100%", maxWidth: 340, marginLeft: "auto", marginRight: "auto",
         }}
       >
-        {/* Header */}
+        {/* Header — no absolute positioning for html2canvas compat */}
         <div style={{
           background: "linear-gradient(135deg, #ff3d5c, #e61e3d)",
           padding: "20px 24px 16px",
           color: "#fff",
-          position: "relative",
         }}>
-          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginBottom: 4 }}>薯医诊断</div>
-          <div style={{
-            fontSize: 13, fontWeight: 600, lineHeight: 1.4,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
-            maxWidth: 200,
-          }}>
-            {title}
-          </div>
-          <div style={{
-            position: "absolute", right: 24, top: 16, textAlign: "center",
-          }}>
-            <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1 }}>
-              {Math.round(report.overall_score)}
-            </div>
-            <div style={{
-              fontSize: 12, fontWeight: 700,
-              backgroundColor: "rgba(255,255,255,0.2)",
-              padding: "2px 8px", borderRadius: 6, marginTop: 4, display: "inline-block",
-            }}>
-              {report.grade}
-            </div>
-          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.8, marginBottom: 8 }}>薯医诊断</div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}><tbody><tr>
+            <td style={{ verticalAlign: "top", paddingRight: 12 }}>
+              <div style={{
+                fontSize: 14, fontWeight: 700, lineHeight: 1.5,
+                wordBreak: "break-all" as const,
+              }}>
+                {title || "未命名笔记"}
+              </div>
+            </td>
+            <td style={{ verticalAlign: "top", textAlign: "right" as const, whiteSpace: "nowrap" as const, width: 70 }}>
+              <div style={{ fontSize: 40, fontWeight: 900, lineHeight: 1 }}>
+                {Math.round(report.overall_score)}
+              </div>
+              <div style={{
+                fontSize: 12, fontWeight: 700,
+                backgroundColor: "rgba(255,255,255,0.2)",
+                padding: "2px 8px", borderRadius: 6, marginTop: 4, display: "inline-block",
+              }}>
+                {report.grade}
+              </div>
+            </td>
+          </tr></tbody></table>
         </div>
 
         {/* Bars */}

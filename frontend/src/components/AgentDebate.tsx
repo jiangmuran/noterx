@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Typography, Stack, Button } from "@mui/material";
+import { Box, Typography, Stack } from "@mui/material";
 import { AnimatePresence, motion } from "framer-motion";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import type { AgentOpinion, DebateEntry } from "../utils/api";
@@ -10,7 +10,6 @@ interface Props {
   timeline?: DebateEntry[];
 }
 
-/* Agent 颜色系统 */
 const AGENT_COLORS: Record<string, { bg: string; accent: string; text: string }> = {
   "内容分析师": { bg: "#fff5f6", accent: "#ff2442", text: "#dc2626" },
   "视觉诊断师": { bg: "#faf5ff", accent: "#8b5cf6", text: "#7c3aed" },
@@ -31,83 +30,51 @@ function agentInitial(name: string): string {
 
 export default function AgentDebate({ opinions, summary, timeline }: Props) {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
-  const [showAllTimeline, setShowAllTimeline] = useState(false);
 
   return (
     <Stack spacing={2}>
-      {/* Summary */}
       {summary && (
         <Box sx={{ bgcolor: "#f9f9f9", borderRadius: "10px", px: 2, py: 1.5 }}>
           <Typography sx={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>{summary}</Typography>
         </Box>
       )}
 
-      {/* Agent opinions as cards */}
+      {/* Agent opinion cards */}
       {opinions.map((op, idx) => {
         const isOpen = expandedIdx === idx;
         const colors = AGENT_COLORS[op.agent_name] || { bg: "#f9f9f9", accent: "#666", text: "#333" };
         const scoreColor = op.score >= 75 ? "#16a34a" : op.score >= 50 ? "#d97706" : "#dc2626";
-
         return (
           <Box key={idx}>
-            <Box
-              onClick={() => setExpandedIdx(isOpen ? null : idx)}
-              sx={{
-                display: "flex", alignItems: "center", gap: 1.25,
-                px: 1.5, py: 1.25, cursor: "pointer",
-                borderRadius: isOpen ? "12px 12px 0 0" : "12px",
-                bgcolor: colors.bg, border: `1px solid ${colors.accent}20`,
-                transition: "all 0.2s",
-                "&:hover": { bgcolor: `${colors.accent}10` },
-              }}
-            >
-              {/* Avatar */}
-              <Box sx={{
-                width: 32, height: 32, borderRadius: "8px", flexShrink: 0,
-                bgcolor: colors.accent, display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <Typography sx={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>
-                  {agentInitial(op.agent_name)}
-                </Typography>
+            <Box onClick={() => setExpandedIdx(isOpen ? null : idx)} sx={{
+              display: "flex", alignItems: "center", gap: 1.25,
+              px: 1.5, py: 1.25, cursor: "pointer",
+              borderRadius: isOpen ? "12px 12px 0 0" : "12px",
+              bgcolor: colors.bg, border: `1px solid ${colors.accent}20`,
+              "&:hover": { bgcolor: `${colors.accent}10` },
+            }}>
+              <Box sx={{ width: 32, height: 32, borderRadius: "8px", flexShrink: 0,
+                bgcolor: colors.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography sx={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{agentInitial(op.agent_name)}</Typography>
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontWeight: 600, fontSize: 13, color: "#262626" }}>
-                  {op.agent_name}
-                </Typography>
+                <Typography sx={{ fontWeight: 600, fontSize: 13, color: "#262626" }}>{op.agent_name}</Typography>
                 <Typography sx={{ fontSize: 11, color: "#999" }}>{op.dimension}</Typography>
               </Box>
-              <Typography sx={{ fontWeight: 800, fontSize: 16, color: scoreColor }}>
-                {Math.round(op.score)}
-              </Typography>
-              <ExpandMoreIcon sx={{
-                color: "#bbb", fontSize: 18,
-                transform: isOpen ? "rotate(180deg)" : "none",
-                transition: "transform 0.2s",
-              }} />
+              <Typography sx={{ fontWeight: 800, fontSize: 16, color: scoreColor }}>{Math.round(op.score)}</Typography>
+              <ExpandMoreIcon sx={{ color: "#bbb", fontSize: 18, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
             </Box>
-
             <AnimatePresence initial={false}>
               {isOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  style={{ overflow: "hidden" }}
-                >
-                  <Box sx={{
-                    px: 2, py: 1.5,
-                    border: `1px solid ${colors.accent}20`, borderTop: "none",
-                    borderRadius: "0 0 12px 12px", bgcolor: "#fff",
-                  }}>
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} style={{ overflow: "hidden" }}>
+                  <Box sx={{ px: 2, py: 1.5, border: `1px solid ${colors.accent}20`, borderTop: "none", borderRadius: "0 0 12px 12px", bgcolor: "#fff" }}>
                     <Stack spacing={1.25}>
                       {op.issues.length > 0 && (
                         <Box>
                           <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#dc2626", mb: 0.5 }}>问题</Typography>
                           {op.issues.map((issue, i) => (
-                            <Typography key={i} sx={{ fontSize: 12, color: "#555", lineHeight: 1.6, pl: 1, borderLeft: "2px solid #fecaca" }}>
-                              {issue}
-                            </Typography>
+                            <Typography key={i} sx={{ fontSize: 12, color: "#555", lineHeight: 1.6, pl: 1, borderLeft: "2px solid #fecaca", mb: 0.5 }}>{issue}</Typography>
                           ))}
                         </Box>
                       )}
@@ -115,9 +82,7 @@ export default function AgentDebate({ opinions, summary, timeline }: Props) {
                         <Box>
                           <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.text, mb: 0.5 }}>建议</Typography>
                           {op.suggestions.map((sug, i) => (
-                            <Typography key={i} sx={{ fontSize: 12, color: "#555", lineHeight: 1.6, pl: 1, borderLeft: `2px solid ${colors.accent}40` }}>
-                              {sug}
-                            </Typography>
+                            <Typography key={i} sx={{ fontSize: 12, color: "#555", lineHeight: 1.6, pl: 1, borderLeft: `2px solid ${colors.accent}40`, mb: 0.5 }}>{sug}</Typography>
                           ))}
                         </Box>
                       )}
@@ -130,59 +95,41 @@ export default function AgentDebate({ opinions, summary, timeline }: Props) {
         );
       })}
 
-      {/* Debate timeline as chat bubbles */}
+      {/* Debate timeline — simple list, no carousel, no auto-scroll */}
       {timeline && timeline.length > 0 && (
         <Box>
           <Typography sx={{ fontWeight: 600, fontSize: 14, color: "#262626", mb: 1.5 }}>
-            辩论过程
+            辩论过程 · {timeline.length} 条
           </Typography>
           <Stack spacing={1}>
-            {(showAllTimeline ? timeline : timeline.slice(0, 4)).map((entry, i) => {
+            {timeline.map((entry, i) => {
               const kind = KIND_STYLE[entry.kind] || KIND_STYLE.add;
               const colors = AGENT_COLORS[entry.agent_name] || { accent: "#666", bg: "#f9f9f9", text: "#333" };
               return (
                 <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                  {/* Mini avatar */}
                   <Box sx={{
                     width: 24, height: 24, borderRadius: "6px", flexShrink: 0, mt: 0.25,
                     bgcolor: colors.accent, display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
-                    <Typography sx={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>
-                      {agentInitial(entry.agent_name)}
-                    </Typography>
+                    <Typography sx={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>{agentInitial(entry.agent_name)}</Typography>
                   </Box>
-                  {/* Bubble */}
                   <Box sx={{
                     flex: 1, minWidth: 0, px: 1.5, py: 1,
-                    borderRadius: "2px 10px 10px 10px",
+                    borderRadius: "4px 10px 10px 10px",
                     bgcolor: kind.bg, border: `1px solid ${kind.color}15`,
                   }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.25 }}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#262626" }}>
-                        {entry.agent_name}
-                      </Typography>
-                      <Box sx={{
-                        fontSize: 9, fontWeight: 700, color: kind.color,
-                        bgcolor: `${kind.color}12`, borderRadius: "4px",
-                        px: 0.5, py: 0.1,
-                      }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#262626" }}>{entry.agent_name}</Typography>
+                      <Box sx={{ fontSize: 9, fontWeight: 700, color: kind.color, bgcolor: `${kind.color}12`, borderRadius: "4px", px: 0.5, py: 0.1 }}>
                         {kind.label}
                       </Box>
                     </Box>
-                    <Typography sx={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>
-                      {entry.text}
-                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>{entry.text}</Typography>
                   </Box>
                 </Box>
               );
             })}
           </Stack>
-          {timeline.length > 4 && (
-            <Button size="small" onClick={() => setShowAllTimeline(!showAllTimeline)}
-              sx={{ mt: 1, fontSize: 12, color: "#999", "&:hover": { color: "#262626" } }}>
-              {showAllTimeline ? "收起" : `展开全部 ${timeline.length} 条`}
-            </Button>
-          )}
         </Box>
       )}
     </Stack>
