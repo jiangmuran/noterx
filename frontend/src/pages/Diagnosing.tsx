@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Box, Typography, useTheme, useMediaQuery } from "@mui/material";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import { preScore, diagnoseStream, diagnoseNote } from "../utils/api";
-import type { DiagnoseResult, PreScoreResult, StreamEvent } from "../utils/api";
+import type { PreScoreResult, StreamEvent } from "../utils/api";
 /* saveHistory removed — #58 fix: history is local-only now */
 import { FALLBACK_REPORT } from "../utils/fallback";
 

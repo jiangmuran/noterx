@@ -18,7 +18,6 @@ import {
   migrateLegacyLocalStorage,
   createPendingId,
   putLocalDiagnosis,
-  replacePendingWithServerId,
 } from "../utils/localMemory";
 import ScoreCard from "../components/ScoreCard";
 import DimensionBars from "../components/DimensionBars";
