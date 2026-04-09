@@ -159,20 +159,22 @@ export default function AgentDebate({ opinions, summary, timeline }: Props) {
               {visible.map((entry, i) => {
                 const kind = KIND_STYLE[entry.kind] || KIND_STYLE.add;
                 return (
-                  <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#262626", flexShrink: 0, minWidth: 70 }}>
-                      {entry.agent_name}
-                    </Typography>
-                    <Box
-                      sx={{
-                        fontSize: 11, fontWeight: 600, color: kind.color,
-                        border: `1px solid ${kind.border}`, borderRadius: "10px",
-                        px: 1, py: 0.125, flexShrink: 0, lineHeight: 1.6,
-                      }}
-                    >
-                      {kind.label}
+                  <Box key={i} sx={{ display: "flex", gap: 0.75, alignItems: "flex-start", flexWrap: { xs: "wrap", md: "nowrap" } }}>
+                    <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", flexShrink: 0 }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#262626" }}>
+                        {entry.agent_name}
+                      </Typography>
+                      <Box
+                        sx={{
+                          fontSize: 10, fontWeight: 600, color: kind.color,
+                          border: `1px solid ${kind.border}`, borderRadius: "8px",
+                          px: 0.75, py: 0.1, lineHeight: 1.5,
+                        }}
+                      >
+                        {kind.label}
+                      </Box>
                     </Box>
-                    <Typography sx={{ fontSize: 13, color: "#505050", lineHeight: 1.6 }}>
+                    <Typography sx={{ fontSize: 13, color: "#505050", lineHeight: 1.6, flex: 1, minWidth: 0 }}>
                       {entry.text}
                     </Typography>
                   </Box>

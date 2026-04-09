@@ -294,7 +294,7 @@ class Orchestrator:
         judge = JudgeAgent(model=MODEL_PRO)
 
         async def _debate_task():
-            return await self._run_debate(agent_opinions, agents_list)
+            return await self._run_debate(agent_opinions, agents_list, progress_cb=_emit_progress)
 
         async def _judge_task():
             return await judge.diagnose(
@@ -348,10 +348,16 @@ class Orchestrator:
         result["model_a_pre_score"] = model_a_score
         return result
 
-    async def _run_debate(self, opinions: list[dict], agents: list) -> tuple[list[dict], int]:
-        debate_tasks = []
+    async def _run_debate(self, opinions: list[dict], agents: list,
+                          progress_cb=None) -> tuple[list[dict], int]:
+        """辩论环节：4个Agent依次发言，每个完成后发送进度事件。"""
+        agent_names = ["内容专家", "视觉专家", "增长顾问", "用户模拟"]
+        debate_records = []
+        debate_tokens = 0
+
+        # Build all prompts first
+        prompts = []
         for i, agent in enumerate(agents):
-            # Only pass essential fields to speed up debate
             other_opinions = []
             for j, op in enumerate(opinions):
                 if j != i:
@@ -363,23 +369,39 @@ class Orchestrator:
                         "suggestions": op.get("suggestions", [])[:3],
                     })
             other_text = json.dumps(other_opinions, ensure_ascii=False)
-            prompt = DEBATE_PROMPT.format(
+            prompts.append(DEBATE_PROMPT.format(
                 agent_name=agent.agent_name, other_opinions=other_text,
-            )
-            debate_tasks.append(agent.call_llm(prompt, system_override=agent.system_prompt, model_override=MODEL_FAST, max_tokens=1024))
+            ))
 
-        results = await asyncio.gather(*debate_tasks, return_exceptions=True)
-        debate_records = []
-        debate_tokens = 0
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.warning("Agent %s 辩论异常: %s", agents[i].agent_name, result)
+        # Run all 4 in parallel but emit progress as each completes
+        async def _single_debate(idx):
+            return idx, await agents[idx].call_llm(
+                prompts[idx], system_override=agents[idx].system_prompt,
+                model_override=MODEL_FAST, max_tokens=1024,
+            )
+
+        tasks = [asyncio.create_task(_single_debate(i)) for i in range(len(agents))]
+        for coro in asyncio.as_completed(tasks):
+            try:
+                idx, result = await coro
+            except Exception as e:
+                logger.warning("辩论异常: %s", e)
                 continue
-            meta = result.pop("_meta", None)
-            if meta:
-                debate_tokens += meta.get("total_tokens", 0)
-            result["agent_name"] = agents[i].agent_name
-            debate_records.append(result)
+            if isinstance(result, dict):
+                meta = result.pop("_meta", None)
+                if meta:
+                    debate_tokens += meta.get("total_tokens", 0)
+                result["agent_name"] = agents[idx].agent_name
+                debate_records.append(result)
+                # Emit progress
+                name = agent_names[idx] if idx < len(agent_names) else agents[idx].agent_name
+                if progress_cb:
+                    try:
+                        ret = progress_cb(f"debate_agent_{idx}", f"{name}辩论完成")
+                        if asyncio.iscoroutine(ret):
+                            await ret
+                    except Exception:
+                        pass
 
         return debate_records, debate_tokens
 
