@@ -1,42 +1,54 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import {
-  Box, Typography, TextField, Button, Chip,
-  CircularProgress, useTheme,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  TextField,
+  Typography,
   useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import HistoryOutlined from "@mui/icons-material/HistoryOutlined";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CategoryPicker from "../components/CategoryPicker";
 import UploadZone from "../components/UploadZone";
+import { showToast } from "../components/Toast";
 import { quickRecognize } from "../utils/api";
 import type { QuickRecognizeResult } from "../utils/api";
 
-/** @returns A stable key for a File object */
-function fkey(f: File) {
-  return `${f.name}_${f.size}_${f.lastModified}`;
+function fileKey(file: File) {
+  return `${file.name}_${file.size}_${file.lastModified}`;
 }
 
-/** 中文垂类 -> 英文 key 映射 */
 const CAT_MAP: Record<string, string> = {
-  "美食": "food", "食谱": "food", "做饭": "food", "烘焙": "food",
-  "穿搭": "fashion", "时尚": "fashion", "服装": "fashion", "outfit": "fashion",
-  "科技": "tech", "数码": "tech", "手机": "tech", "电脑": "tech",
-  "旅行": "travel", "旅游": "travel", "景点": "travel",
-  "美妆": "beauty", "护肤": "beauty", "化妆": "beauty",
-  "健身": "fitness", "运动": "fitness", "减肥": "fitness",
-  "生活": "lifestyle", "日常": "lifestyle", "vlog": "lifestyle",
-  "家居": "home", "装修": "home", "家装": "home",
-  // English keys pass through
-  "food": "food", "fashion": "fashion", "tech": "tech", "travel": "travel",
-  "beauty": "beauty", "fitness": "fitness", "lifestyle": "lifestyle", "home": "home",
+  food: "food",
+  fashion: "fashion",
+  tech: "tech",
+  travel: "travel",
+  beauty: "beauty",
+  fitness: "fitness",
+  lifestyle: "lifestyle",
+  home: "home",
+  "缇庨": "food",
+  "绌挎惌": "fashion",
+  "绉戞妧": "tech",
+  "鏃呮父": "travel",
+  "缇庡": "beauty",
+  "鍋ヨ韩": "fitness",
+  "鐢熸椿": "lifestyle",
+  "瀹跺眳": "home",
 };
 
-/** 快识并行路数：略限流可减少总排队，利于接近「单张 <5s」的体感 */
 const QUICK_RECOGNIZE_CONCURRENCY = 2;
+const SLOT_LABELS: Record<string, string> = {
+  cover: "灏侀潰",
+  content: "璇︽儏",
+  profile: "涓婚〉",
+  comments: "璇勮鍖?",
+};
 
-/** 首页：桌面端双栏布局，移动端单页布局 */
 export default function Home() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -46,80 +58,69 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("food");
-
   const [aiRecogs, setAiRecogs] = useState<Record<string, QuickRecognizeResult>>({});
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
-  const [uploadingPulse, setUploadingPulse] = useState(false);
-  const [analyzingPulse, setAnalyzingPulse] = useState(false);
-
   const [userEdited, setUserEdited] = useState({ title: false, content: false, category: false });
 
-  const uploadPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const analyzePulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognizeInFlightRef = useRef<Set<string>>(new Set());
-  const prevPendingRecognitionRef = useRef(false);
-
-  useEffect(() => { document.title = "薯医 NoteRx"; }, []);
 
   useEffect(() => {
-    return () => {
-      if (uploadPulseTimerRef.current) clearTimeout(uploadPulseTimerRef.current);
-      if (analyzePulseTimerRef.current) clearTimeout(analyzePulseTimerRef.current);
-    };
+    document.title = "钖尰 NoteRx";
   }, []);
 
-  const triggerUploadPulse = useCallback(() => {
-    if (uploadPulseTimerRef.current) clearTimeout(uploadPulseTimerRef.current);
-    setUploadingPulse(true);
-    uploadPulseTimerRef.current = setTimeout(() => {
-      setUploadingPulse(false);
-      uploadPulseTimerRef.current = null;
-    }, 500);
+  const handleFilesChange = useCallback((nextFiles: File[]) => {
+    setFiles(nextFiles.slice(0, 9));
   }, []);
 
-  const handleFilesChange = useCallback(
-    (newFiles: File[]) => {
-      setFiles(newFiles.slice(0, 9));
-      if (newFiles.length > 0) triggerUploadPulse();
-    },
-    [triggerUploadPulse],
-  );
-
-  const appendFiles = useCallback(
-    (incoming: File[]) => {
-      if (incoming.length === 0) return;
-      setFiles((prev) => [...prev, ...incoming].slice(0, 9));
-      triggerUploadPulse();
-    },
-    [triggerUploadPulse],
-  );
-
-  /** Ctrl+V paste images */
   useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
+    const handlePaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
       if (!items) return;
-      const pasted: File[] = [];
+
+      const pastedFiles: File[] = [];
       for (const item of items) {
         if (item.type.startsWith("image/") || item.type.startsWith("video/")) {
           const file = item.getAsFile();
-          if (file) pasted.push(file);
+          if (file) pastedFiles.push(file);
         }
       }
-      appendFiles(pasted);
+
+      if (pastedFiles.length === 0) return;
+      setFiles((prev) => [...prev, ...pastedFiles].slice(0, 9));
     };
+
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [appendFiles]);
+  }, []);
 
-  const anyLoading = useMemo(() => Object.values(aiLoading).some(Boolean), [aiLoading]);
-  const allResults = useMemo(() => Object.values(aiRecogs), [aiRecogs]);
+  const imageFiles = useMemo(() => files.filter((file) => file.type.startsWith("image/")), [files]);
+  const imageKeys = useMemo(() => new Set(imageFiles.map(fileKey)), [imageFiles]);
+
+  const pendingRecognition = useMemo(() => {
+    if (imageKeys.size === 0) return false;
+    for (const key of imageKeys) {
+      if (aiLoading[key] || !aiRecogs[key]) return true;
+    }
+    return false;
+  }, [aiLoading, aiRecogs, imageKeys]);
+
+  const allRecognitionDone = useMemo(() => {
+    if (imageKeys.size === 0) return true;
+    for (const key of imageKeys) {
+      if (aiLoading[key] || !aiRecogs[key]) return false;
+    }
+    return true;
+  }, [aiLoading, aiRecogs, imageKeys]);
+
   const successRecogEntries = useMemo(
-    () => Object.entries(aiRecogs).filter(([, r]) => r.success),
+    () => Object.entries(aiRecogs).filter(([, result]) => result.success),
     [aiRecogs],
   );
-  const successResults = useMemo(
-    () => successRecogEntries.map(([, r]) => r),
+  const allResults = useMemo(() => Object.values(aiRecogs), [aiRecogs]);
+  const allFailed = imageKeys.size > 0 && allRecognitionDone && successRecogEntries.length === 0 && allResults.length > 0;
+
+  const recognizedSlots = useMemo(
+    () => new Set(successRecogEntries.map(([, result]) => (result.slot_type || "").toLowerCase()).filter(Boolean)),
     [successRecogEntries],
   );
 
@@ -127,488 +128,359 @@ export default function Home() {
     let bestTitle = "";
     let bestContent = "";
     let bestCategory = "";
-    let bestSummary = "";
 
-    // 优先从 content 类型提取，但如果没有 content 类型，也从其他类型提取
-    for (const [, r] of successRecogEntries) {
-      if ((r.slot_type || "").toLowerCase() === "content") {
-        if (!bestTitle && r.title?.trim()) bestTitle = r.title.trim();
-        if (!bestContent && r.content_text?.trim()) bestContent = r.content_text.trim();
-      }
-      if (!bestCategory && r.category?.trim()) bestCategory = r.category.trim();
-      if (!bestSummary && r.summary?.trim()) bestSummary = r.summary.trim();
-    }
-    // Fallback: 如果 content 类型没提取到，从任意类型取
-    if (!bestTitle || !bestContent) {
-      for (const [, r] of successRecogEntries) {
-        if (!bestTitle && r.title?.trim()) bestTitle = r.title.trim();
-        if (!bestContent && r.content_text?.trim()) bestContent = r.content_text.trim();
-      }
+    for (const [, result] of successRecogEntries) {
+      if (!bestTitle && result.title?.trim()) bestTitle = result.title.trim();
+      if (!bestContent && result.content_text?.trim()) bestContent = result.content_text.trim();
+      if (!bestCategory && result.category?.trim()) bestCategory = result.category.trim();
     }
 
-    return { bestTitle, bestContent, bestCategory, bestSummary };
+    return { bestTitle, bestContent, bestCategory };
   }, [successRecogEntries]);
 
-  const imageFileKeys = useMemo(
-    () => new Set(files.filter((f) => f.type.startsWith("image/")).map(fkey)),
-    [files],
-  );
-
-  const pendingRecognition = useMemo(() => {
-    if (imageFileKeys.size === 0) return false;
-    for (const key of imageFileKeys) {
-      if (aiLoading[key] || !aiRecogs[key]) return true;
-    }
-    return false;
-  }, [imageFileKeys, aiLoading, aiRecogs]);
-
-  const allRecognitionDone = useMemo(() => {
-    if (imageFileKeys.size === 0) return false;
-    for (const k of imageFileKeys) {
-      if (!aiRecogs[k] && !aiLoading[k]) return false;
-      if (aiLoading[k]) return false;
-    }
-    return true;
-  }, [imageFileKeys, aiRecogs, aiLoading]);
-
   useEffect(() => {
-    const { bestTitle, bestContent, bestCategory } = aggregated;
-
-    if (!userEdited.title && bestTitle) {
-      setTitle(bestTitle.slice(0, 100));
-    }
-    if (!userEdited.content && bestContent) {
-      setContent(bestContent);
-    }
-    if (!userEdited.category && bestCategory) {
-      const mapped = CAT_MAP[bestCategory];
+    if (!userEdited.title && aggregated.bestTitle) setTitle(aggregated.bestTitle.slice(0, 100));
+    if (!userEdited.content && aggregated.bestContent) setContent(aggregated.bestContent);
+    if (!userEdited.category && aggregated.bestCategory) {
+      const mapped = CAT_MAP[aggregated.bestCategory];
       if (mapped) setCategory(mapped);
     }
   }, [aggregated, userEdited]);
 
-  const allFailed = allRecognitionDone && successResults.length === 0 && allResults.length > 0;
-
-  const showWarnings = allRecognitionDone && files.length > 0 && !allFailed;
-  const warnings = useMemo(() => {
-    if (!showWarnings) return { title: false, content: false, category: false };
-    const { bestTitle, bestContent, bestCategory, bestSummary } = aggregated;
-    return {
-      title: !bestTitle && !bestSummary,
-      content: !bestContent,
-      category: !bestCategory,
-    };
-  }, [showWarnings, aggregated]);
-
-  const autoFilled = useMemo(() => {
-    const { bestTitle, bestContent, bestCategory, bestSummary } = aggregated;
-    return {
-      title: !userEdited.title && !!(bestTitle || bestSummary),
-      content: !userEdited.content && !!bestContent,
-      category: !userEdited.category && !!bestCategory && !!CAT_MAP[bestCategory],
-    };
-  }, [aggregated, userEdited]);
-
-  const runRecognition = useCallback(async (file: File, slotHint?: "cover" | "content" | "profile" | "comments") => {
-    const key = fkey(file);
+  const runRecognition = useCallback(async (file: File) => {
+    const key = fileKey(file);
     if (recognizeInFlightRef.current.has(key)) return;
+
     recognizeInFlightRef.current.add(key);
-    setAiLoading((p) => {
-      if (p[key]) return p;
-      return { ...p, [key]: true };
-    });
+    setAiLoading((prev) => ({ ...prev, [key]: true }));
+
     try {
-      const res = await quickRecognize(file, slotHint);
-      setAiRecogs((p) => ({ ...p, [key]: res }));
+      const result = await quickRecognize(file);
+      setAiRecogs((prev) => ({ ...prev, [key]: result }));
     } catch {
-      setAiRecogs((p) => ({ ...p, [key]: { success: false, slot_type: "unknown", category: "", summary: "", error: "识别失败" } }));
+      setAiRecogs((prev) => ({
+        ...prev,
+        [key]: {
+          success: false,
+          slot_type: "unknown",
+          category: "",
+          summary: "",
+          error: "璇嗗埆澶辫触",
+        },
+      }));
     } finally {
       recognizeInFlightRef.current.delete(key);
-      setAiLoading((p) => ({ ...p, [key]: false }));
+      setAiLoading((prev) => ({ ...prev, [key]: false }));
     }
   }, []);
 
   useEffect(() => {
-    const validKeys = new Set(files.map(fkey));
+    const validKeys = new Set(files.map(fileKey));
+
     setAiRecogs((prev) => {
-      let changed = false;
       const next: Record<string, QuickRecognizeResult> = {};
       Object.entries(prev).forEach(([key, value]) => {
         if (validKeys.has(key)) next[key] = value;
-        else changed = true;
       });
-      return changed ? next : prev;
+      return next;
     });
+
     setAiLoading((prev) => {
-      let changed = false;
       const next: Record<string, boolean> = {};
       Object.entries(prev).forEach(([key, value]) => {
         if (validKeys.has(key)) next[key] = value;
-        else changed = true;
       });
-      return changed ? next : prev;
+      return next;
     });
+
     recognizeInFlightRef.current.forEach((key) => {
       if (!validKeys.has(key)) recognizeInFlightRef.current.delete(key);
     });
   }, [files]);
 
   useEffect(() => {
-    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
-    const inFlight = imageFiles.filter((f) => aiLoading[fkey(f)]).length;
+    const inFlight = imageFiles.filter((file) => aiLoading[fileKey(file)]).length;
     const freeSlots = Math.max(0, QUICK_RECOGNIZE_CONCURRENCY - inFlight);
-    const need = imageFiles.filter((f) => {
-      const k = fkey(f);
-      return !aiRecogs[k] && !aiLoading[k];
+    const waitingFiles = imageFiles.filter((file) => {
+      const key = fileKey(file);
+      return !aiRecogs[key] && !aiLoading[key];
     });
-    need.slice(0, freeSlots).forEach((file) => {
+
+    waitingFiles.slice(0, freeSlots).forEach((file) => {
       void runRecognition(file);
     });
-  }, [files, aiRecogs, aiLoading, runRecognition]);
+  }, [aiLoading, aiRecogs, imageFiles, runRecognition]);
 
   useEffect(() => {
-    if (!prevPendingRecognitionRef.current && pendingRecognition && analyzePulseTimerRef.current) {
-      clearTimeout(analyzePulseTimerRef.current);
-      analyzePulseTimerRef.current = null;
-      setAnalyzingPulse(false);
-    }
-    if (prevPendingRecognitionRef.current && !pendingRecognition && imageFileKeys.size > 0) {
-      if (analyzePulseTimerRef.current) clearTimeout(analyzePulseTimerRef.current);
-      setAnalyzingPulse(true);
-      analyzePulseTimerRef.current = setTimeout(() => {
-        setAnalyzingPulse(false);
-        analyzePulseTimerRef.current = null;
-      }, 700);
-    }
-    prevPendingRecognitionRef.current = pendingRecognition;
-  }, [pendingRecognition, imageFileKeys.size]);
-
-  useEffect(() => {
-    if (files.length === 0) {
-      setAiRecogs({});
-      setAiLoading({});
-      recognizeInFlightRef.current.clear();
-      setUserEdited({ title: false, content: false, category: false });
-      setTitle("");
-      setContent("");
-      setCategory("food");
-      setUploadingPulse(false);
-      setAnalyzingPulse(false);
-      if (uploadPulseTimerRef.current) {
-        clearTimeout(uploadPulseTimerRef.current);
-        uploadPulseTimerRef.current = null;
-      }
-      if (analyzePulseTimerRef.current) {
-        clearTimeout(analyzePulseTimerRef.current);
-        analyzePulseTimerRef.current = null;
-      }
-    }
+    if (files.length > 0) return;
+    setAiRecogs({});
+    setAiLoading({});
+    setUserEdited({ title: false, content: false, category: false });
+    setTitle("");
+    setContent("");
+    setCategory("food");
   }, [files.length]);
 
   const processingStatus = useMemo(() => {
     if (files.length === 0) return null;
-    if (uploadingPulse) {
-      return { label: "上传中", tone: "info" as const, text: "素材已接收，正在准备识别..." };
-    }
     if (pendingRecognition) {
-      return { label: "识别中", tone: "info" as const, text: "AI 正在自动识别封面/详情/主页/评论区..." };
-    }
-    if (analyzingPulse) {
-      return { label: "分析中", tone: "info" as const, text: "正在汇总识别结果并回填表单..." };
+      return { tone: "info" as const, text: "AI 正在识别截图内容，请稍候..." };
     }
     if (allRecognitionDone) {
-      return { label: "已就绪", tone: "success" as const, text: "识别完成，可以继续发起诊断。" };
+      return { tone: "success" as const, text: "素材已就绪，可以开始诊断。" };
     }
-    return null;
-  }, [files.length, uploadingPulse, pendingRecognition, analyzingPulse, allRecognitionDone]);
+    return { tone: "info" as const, text: "素材已上传，正在准备识别..." };
+  }, [allRecognitionDone, files.length, pendingRecognition]);
 
-  const lockInputs = !!processingStatus && processingStatus.label !== "已就绪";
   const isFormBlocked = files.length > 0 && !allRecognitionDone;
+  const canSubmit = files.length > 0 && title.trim().length > 0 && !isFormBlocked;
+  const hasDetailScreenshot = recognizedSlots.has("content");
+
+  const submitHint = useMemo(() => {
+    if (files.length === 0) return "请先上传笔记素材";
+    if (isFormBlocked) return "AI 识别完成后才能开始诊断";
+    if (!title.trim()) {
+      return allFailed ? "AI 未识别出标题，请手动填写标题后继续" : "请填写标题，或补充能识别标题的截图";
+    }
+    if (imageKeys.size > 0 && !hasDetailScreenshot) return "建议补充详情页截图，诊断结果会更完整";
+    return "当前可以直接开始诊断";
+  }, [allFailed, files.length, hasDetailScreenshot, imageKeys.size, isFormBlocked, title]);
 
   const handleSubmit = () => {
-    if (!canSubmit) return;
+    if (files.length === 0) {
+      showToast("请先上传笔记素材", "warning");
+      return;
+    }
+    if (isFormBlocked) {
+      showToast("AI 还在识别素材，稍后再试", "info");
+      return;
+    }
+    if (!title.trim()) {
+      showToast("请先填写标题，或补充可识别标题的截图", "warning");
+      return;
+    }
+
     navigate("/diagnosing", {
       state: {
-        title, content, tags: "", category,
-        coverFile: files.find((f) => f.type.startsWith("image/")) ?? null,
-        coverImages: files.filter((f) => f.type.startsWith("image/")),
-        videoFile: files.find((f) => f.type.startsWith("video/")) ?? null,
+        title,
+        content,
+        tags: "",
+        category,
+        coverFile: files.find((file) => file.type.startsWith("image/")) ?? null,
+        coverImages: files.filter((file) => file.type.startsWith("image/")),
+        videoFile: files.find((file) => file.type.startsWith("video/")) ?? null,
       },
     });
   };
 
-  const recognizedSlots = useMemo(
-    () => new Set(
-      successRecogEntries
-        .map(([, r]) => (typeof r.slot_type === "string" ? r.slot_type.toLowerCase() : ""))
-        .filter(Boolean),
-    ),
-    [successRecogEntries],
-  );
-  const hasDetailScreenshot = recognizedSlots.has("content");
-  const canSubmit = files.length > 0 && title.trim().length > 0 && !lockInputs && !isFormBlocked;
-  /* aiSuggestion removed — detail screenshot warning shown inline below CTA */
-  const slotLabelMap: Record<string, string> = {
-    content: "详情",
-    cover: "封面",
-    profile: "主页",
-    comments: "评论区",
-  };
-
-  const isReady = files.length > 0 && allRecognitionDone;
-  const [leaving, setLeaving] = useState(false);
-
   return (
-    <Box sx={{
-      height: "100dvh",
-      display: "flex",
-      flexDirection: "column",
-      bgcolor: "#fafafa",
-      overflow: "hidden",
-    }}>
-
-      {/* ═══ Header — 所有信息压在一行 ═══ */}
-      <Box component="header" sx={{
-        flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        px: { xs: 1.5, md: 3 }, height: 48,
-        bgcolor: "#fff", borderBottom: "1px solid #f0f0f0",
-      }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 0.75, md: 1.5 } }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexShrink: 0 }}>
-            <Box sx={{
-              width: 24, height: 24, borderRadius: "6px",
-              background: "linear-gradient(135deg, #ff5c6f, #e61e3d)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Typography sx={{ color: "#fff", fontSize: 10, fontWeight: 800, fontFamily: "Inter" }}>Rx</Typography>
-            </Box>
-            <Typography sx={{ fontSize: 14, fontWeight: 800, color: "#262626", letterSpacing: "-0.02em" }}>
-              薯医
-            </Typography>
-          </Box>
-          {/* Desktop: inline description */}
-          <Typography sx={{
-            display: { xs: "none", md: "block" },
-            fontSize: 12, color: "#999", fontWeight: 500,
-          }}>
-            AI 诊断你的小红书笔记 · 基于 874 条真实数据
-          </Typography>
+    <Box sx={{ minHeight: "100vh", bgcolor: "#fafafa", display: "flex", flexDirection: "column" }}>
+      <Box
+        component="header"
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          px: { xs: 2, md: 3 },
+          py: 1.5,
+          bgcolor: "#fff",
+          borderBottom: "1px solid #f0f0f0",
+        }}
+      >
+        <Box>
+          <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#262626" }}>钖尰 NoteRx</Typography>
+          <Typography sx={{ fontSize: 12, color: "#999" }}>AI 诊断你的小红书笔记</Typography>
         </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <Button
-            onClick={() => { setLeaving(true); setTimeout(() => { window.location.href = "/"; }, 400); }}
-            size="small"
-            sx={{ color: "#999", fontSize: 12, fontWeight: 600, minWidth: "auto", px: 1, borderRadius: "8px",
-              "&:hover": { color: "#ff2442", bgcolor: "#fff0f2" } }}
-          >
-            白皮书
-          </Button>
-          <Button startIcon={<HistoryOutlined sx={{ fontSize: 14 }} />}
-            onClick={() => navigate("/history")} size="small"
-            sx={{ color: "#999", fontSize: 12, fontWeight: 600, minWidth: "auto", px: 1, borderRadius: "8px",
-              "&:hover": { color: "#262626", bgcolor: "#f5f5f5" } }}
-          >
-            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>历史</Box>
-          </Button>
-        </Box>
-      </Box>
-
-      {/* ═══ Work area — 填满剩余空间，桌面不滚动 ═══ */}
-      <Box sx={{
-        flex: 1,
-        display: "flex", justifyContent: "center", alignItems: "stretch",
-        px: { xs: 0, md: 3 },
-        py: { xs: 0, md: 2 },
-        pb: { xs: "68px", md: 2 },
-        overflow: { xs: "auto", md: "hidden" },
-        minHeight: 0,
-      }}>
-        <Box sx={{
-          width: "100%", maxWidth: 1000,
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr" },
-          gap: { xs: 0, md: 2 },
-          alignItems: "stretch",
-          minHeight: 0,
-        }}>
-
-          {/* ═══ Left: Upload ═══ */}
-          <Box sx={{
-            bgcolor: "#fff",
-            border: { md: "1px solid #f0f0f0" },
-            borderBottom: { xs: "1px solid #f0f0f0", md: "1px solid #f0f0f0" },
-            borderRadius: { xs: 0, md: "14px" },
-            p: { xs: 2, md: 2.5 },
-            display: "flex", flexDirection: "column",
-            gap: 1.5,
-            minHeight: 0,
-            overflow: "hidden",
-          }}>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-              <Box>
-                <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#262626" }}>
-                  上传笔记素材
-                </Typography>
-                <Typography sx={{ fontSize: 12, color: "#999", mt: 0.25 }}>
-                  把小红书截图拖进来，AI 自动识别标题、正文、分类
-                </Typography>
-              </Box>
-              {files.length > 0 && (
-                <Chip size="small" label={`${files.length}/9`} sx={{
-                  height: 22, fontSize: 10, fontWeight: 700,
-                  bgcolor: isReady ? "#f0fdf4" : "#eff6ff",
-                  color: isReady ? "#16a34a" : "#2563eb",
-                  border: isReady ? "1px solid #bbf7d0" : "1px solid #bfdbfe",
-                }} />
-              )}
-            </Box>
-
-            <Box sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-              <UploadZone files={files} onFilesChange={handleFilesChange} maxFiles={9} compact={isDesktop} />
-            </Box>
-
-            {/* Slot chips + AI status — 同一行 */}
-            <AnimatePresence>
-              {files.length > 0 && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
-                  style={{ flexShrink: 0 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 0.75 }}>
-                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", alignItems: "center" }}>
-                      {Object.entries(slotLabelMap).map(([slot, label]) => (
-                        <Chip key={slot} size="small" label={label}
-                          color={recognizedSlots.has(slot) ? "success" : "default"}
-                          variant={recognizedSlots.has(slot) ? "filled" : "outlined"}
-                          sx={{ fontSize: 10, height: 20 }} />
-                      ))}
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      {(anyLoading || (processingStatus && processingStatus.tone === "info")) && (
-                        <CircularProgress size={12} thickness={5} sx={{ color: "#ff2442" }} />
-                      )}
-                      {isReady && <CheckCircleIcon sx={{ fontSize: 13, color: "#16a34a" }} />}
-                      <Typography sx={{ fontSize: 11, color: allFailed ? "#dc2626" : isReady ? "#16a34a" : "#999", fontWeight: 500 }}>
-                        {allFailed ? "识别失败" : isReady ? "完成" : anyLoading ? "识别中" : ""}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </Box>
-
-          {/* ═══ Right: Form ═══ */}
-          <Box sx={{
-            bgcolor: "#fff",
-            border: { md: "1px solid #f0f0f0" },
-            borderRadius: { xs: 0, md: "14px" },
-            p: { xs: 2, md: 2.5 },
-            display: "flex", flexDirection: "column",
-            gap: 1.75,
-            minHeight: 0,
-            overflow: { xs: "visible", md: "auto" },
-          }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#262626", flexShrink: 0 }}>
-              笔记信息
-            </Typography>
-
-            {isFormBlocked && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 1, py: 0.5, borderRadius: "8px", bgcolor: "#eff6ff", flexShrink: 0 }}>
-                <CircularProgress size={12} thickness={5} sx={{ color: "#3b82f6" }} />
-                <Typography sx={{ fontSize: 12, color: "#3b82f6", fontWeight: 500 }}>AI 识别中，完成后自动填入</Typography>
-              </Box>
-            )}
-
-            <Box sx={{
-              flex: 1, minHeight: 0,
-              opacity: isFormBlocked ? 0.4 : 1,
-              pointerEvents: isFormBlocked ? "none" : "auto",
-              transition: "opacity 0.3s",
-              display: "flex", flexDirection: "column", gap: 1.75,
-            }}>
-              <Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5 }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#262626" }}>标题</Typography>
-                  {autoFilled.title && <Typography sx={{ fontSize: 10, color: "#16a34a", fontWeight: 600 }}>AI 已填</Typography>}
-                </Box>
-                <TextField required fullWidth size="small" disabled={lockInputs} value={title}
-                  onChange={(e) => { setTitle(e.target.value); setUserEdited((p) => ({ ...p, title: true })); }}
-                  placeholder="笔记标题" slotProps={{ htmlInput: { maxLength: 100 } }} />
-                {showWarnings && warnings.title && !title.trim() && !userEdited.title && (
-                  <Typography sx={{ fontSize: 11, color: "#d97706", mt: 0.5 }}>请手动输入标题</Typography>
-                )}
-              </Box>
-
-              <Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5 }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#262626" }}>正文</Typography>
-                  {autoFilled.content && <Typography sx={{ fontSize: 10, color: "#16a34a", fontWeight: 600 }}>AI 已填</Typography>}
-                </Box>
-                <TextField fullWidth multiline rows={isDesktop ? 3 : 3} size="small" disabled={lockInputs} value={content}
-                  onChange={(e) => { setContent(e.target.value); setUserEdited((p) => ({ ...p, content: true })); }}
-                  placeholder="笔记正文（可选）" />
-              </Box>
-
-              <Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.75 }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#262626" }}>垂类</Typography>
-                  {autoFilled.category && <Typography sx={{ fontSize: 10, color: "#16a34a", fontWeight: 600 }}>AI 已识别</Typography>}
-                </Box>
-                <CategoryPicker value={category} onChange={(v) => { setCategory(v); setUserEdited((p) => ({ ...p, category: true })); }} />
-              </Box>
-            </Box>
-
-            {/* Desktop CTA */}
-            <Box sx={{ display: { xs: "none", md: "flex" }, flexDirection: "column", gap: 1, flexShrink: 0, pt: 0.5 }}>
-              <Button variant="contained" fullWidth disabled={!canSubmit} onClick={handleSubmit}
-                sx={{
-                  py: 1.1, fontSize: 14, fontWeight: 700, borderRadius: "10px", minHeight: 42,
-                  background: "#ff2442", boxShadow: "0 4px 16px rgba(255,36,66,0.25)",
-                  "&:hover": { background: "#e61e3d", transform: "translateY(-1px)", boxShadow: "0 6px 24px rgba(255,36,66,0.35)" },
-                  "&:active": { transform: "translateY(0)" },
-                  "&.Mui-disabled": { background: "#eee", boxShadow: "none", color: "#bbb" },
-                }}
-              >
-                开始诊断
-              </Button>
-              {files.length > 0 && allRecognitionDone && !hasDetailScreenshot && (
-                <Typography sx={{ fontSize: 10, color: "#d97706", textAlign: "center" }}>建议补充详情页截图</Typography>
-              )}
-            </Box>
-          </Box>
-        </Box>
-      </Box>
-
-      {/* ═══ Mobile fixed CTA ═══ */}
-      <Box sx={{
-        display: { xs: "block", md: "none" },
-        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 30,
-        px: 1.5, pt: 1,
-        pb: "max(8px, env(safe-area-inset-bottom))",
-        bgcolor: "rgba(255,255,255,0.95)", borderTop: "1px solid #f0f0f0",
-      }}>
-        <Button variant="contained" fullWidth disabled={!canSubmit} onClick={handleSubmit}
-          sx={{
-            py: 1.1, fontSize: 15, fontWeight: 700, borderRadius: "10px", minHeight: 46,
-            background: "#ff2442", boxShadow: "0 4px 16px rgba(255,36,66,0.25)",
-            "&:hover": { background: "#e61e3d" },
-            "&.Mui-disabled": { background: "#eee", boxShadow: "none", color: "#bbb" },
-          }}
+        <Button
+          startIcon={<HistoryOutlined sx={{ fontSize: 16 }} />}
+          onClick={() => navigate("/history")}
+          sx={{ color: "#666", fontSize: 13, fontWeight: 600 }}
         >
-          开始诊断
+          鍘嗗彶
         </Button>
       </Box>
 
-      {/* Transition overlay */}
-      <AnimatePresence>
-        {leaving && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}
-            style={{ position: "fixed", inset: 0, zIndex: 100, background: "#ff2442",
-              display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Typography sx={{ color: "#fff", fontSize: 18, fontWeight: 900 }}>薯医 NoteRx</Typography>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Box
+        sx={{
+          width: "100%",
+          maxWidth: 1080,
+          mx: "auto",
+          px: { xs: 2, md: 3 },
+          py: { xs: 2, md: 3 },
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1.1fr 0.9fr" },
+          gap: 2,
+          flex: 1,
+        }}
+      >
+        <Box
+          sx={{
+            bgcolor: "#fff",
+            border: "1px solid #f0f0f0",
+            borderRadius: { xs: "16px", md: "18px" },
+            p: { xs: 2, md: 2.5 },
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Box>
+              <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#262626" }}>上传素材</Typography>
+              <Typography sx={{ fontSize: 12, color: "#999", mt: 0.5 }}>
+                支持图片和视频，图片会自动识别标题、正文和垂类。
+              </Typography>
+            </Box>
+            {files.length > 0 && (
+              <Chip
+                size="small"
+                label={`${files.length}/9`}
+                sx={{
+                  bgcolor: canSubmit ? "#f0fdf4" : "#eff6ff",
+                  color: canSubmit ? "#16a34a" : "#2563eb",
+                  border: canSubmit ? "1px solid #bbf7d0" : "1px solid #bfdbfe",
+                }}
+              />
+            )}
+          </Box>
+
+          <UploadZone files={files} onFilesChange={handleFilesChange} maxFiles={9} compact={isDesktop} />
+
+          {allFailed && (
+            <Box sx={{ px: 1.25, py: 1, borderRadius: "12px", bgcolor: "#fff7ed", border: "1px solid #fed7aa" }}>
+              <Typography sx={{ fontSize: 12, color: "#c2410c", fontWeight: 600 }}>
+                AI 暂时没识别出有效信息，可以手动填写标题后继续诊断。
+              </Typography>
+            </Box>
+          )}
+
+          {files.length > 0 && (
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, flexWrap: "wrap" }}>
+              <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
+                {Object.entries(SLOT_LABELS).map(([slot, label]) => (
+                  <Chip
+                    key={slot}
+                    size="small"
+                    label={label}
+                    color={recognizedSlots.has(slot) ? "success" : "default"}
+                    variant={recognizedSlots.has(slot) ? "filled" : "outlined"}
+                  />
+                ))}
+              </Box>
+
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                {pendingRecognition && <CircularProgress size={14} thickness={5} sx={{ color: "#ff2442" }} />}
+                {!pendingRecognition && allRecognitionDone && <CheckCircleIcon sx={{ fontSize: 14, color: "#16a34a" }} />}
+                <Typography sx={{ fontSize: 11, color: pendingRecognition ? "#64748b" : "#16a34a", fontWeight: 600 }}>
+                  {pendingRecognition ? "识别中" : "已就绪"}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+
+          {processingStatus && (
+            <Typography sx={{ fontSize: 12, color: processingStatus.tone === "success" ? "#16a34a" : "#64748b" }}>
+              {processingStatus.text}
+            </Typography>
+          )}
+        </Box>
+
+        <Box
+          sx={{
+            bgcolor: "#fff",
+            border: "1px solid #f0f0f0",
+            borderRadius: { xs: "16px", md: "18px" },
+            p: { xs: 2, md: 2.5 },
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+          }}
+        >
+          <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#262626" }}>笔记信息</Typography>
+
+          <Box
+            sx={{
+              px: 1.25,
+              py: 1,
+              borderRadius: "12px",
+              bgcolor: canSubmit ? "#f0fdf4" : "#fff7ed",
+              border: canSubmit ? "1px solid #bbf7d0" : "1px solid #fed7aa",
+            }}
+          >
+            <Typography sx={{ fontSize: 12, color: canSubmit ? "#166534" : "#c2410c", fontWeight: 600 }}>
+              {submitHint}
+            </Typography>
+          </Box>
+
+          <Box sx={{ opacity: isFormBlocked ? 0.5 : 1, pointerEvents: isFormBlocked ? "none" : "auto", transition: "opacity 0.2s ease" }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#262626", mb: 0.5 }}>
+              标题
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              required
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                setUserEdited((prev) => ({ ...prev, title: true }));
+              }}
+              placeholder="请输入笔记标题"
+              slotProps={{ htmlInput: { maxLength: 100 } }}
+            />
+          </Box>
+
+          <Box sx={{ opacity: isFormBlocked ? 0.5 : 1, pointerEvents: isFormBlocked ? "none" : "auto", transition: "opacity 0.2s ease" }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#262626", mb: 0.5 }}>
+              正文
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              multiline
+              minRows={isDesktop ? 4 : 3}
+              value={content}
+              onChange={(event) => {
+                setContent(event.target.value);
+                setUserEdited((prev) => ({ ...prev, content: true }));
+              }}
+              placeholder="可选，补充笔记正文"
+            />
+          </Box>
+
+          <Box sx={{ opacity: isFormBlocked ? 0.5 : 1, pointerEvents: isFormBlocked ? "none" : "auto", transition: "opacity 0.2s ease" }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#262626", mb: 0.75 }}>
+              垂类
+            </Typography>
+            <CategoryPicker
+              value={category}
+              onChange={(nextCategory) => {
+                setCategory(nextCategory);
+                setUserEdited((prev) => ({ ...prev, category: true }));
+              }}
+            />
+          </Box>
+
+          <Button
+            variant="contained"
+            fullWidth
+            disabled={!canSubmit}
+            onClick={handleSubmit}
+            sx={{
+              py: 1.2,
+              fontSize: 15,
+              fontWeight: 700,
+              borderRadius: "12px",
+              background: "#ff2442",
+              boxShadow: "0 8px 24px rgba(255,36,66,0.18)",
+              "&:hover": { background: "#e61e3d" },
+              "&.Mui-disabled": { background: "#e5e7eb", color: "#9ca3af", boxShadow: "none" },
+            }}
+          >
+            开始诊断
+          </Button>
+        </Box>
+      </Box>
     </Box>
   );
 }

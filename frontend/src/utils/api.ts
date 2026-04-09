@@ -8,6 +8,29 @@ const api = axios.create({
   timeout: 120000,
 });
 
+function readErrorDetail(data: unknown): string | null {
+  if (typeof data === "string" && data.trim()) return data.trim();
+  if (!data || typeof data !== "object") return null;
+
+  const detail = (data as { detail?: unknown }).detail;
+  if (typeof detail === "string" && detail.trim()) return detail.trim();
+
+  const message = (data as { message?: unknown }).message;
+  if (typeof message === "string" && message.trim()) return message.trim();
+
+  return null;
+}
+
+export function getErrorMessage(error: unknown, fallback = "请求失败，请重试"): string {
+  if (axios.isAxiosError(error)) {
+    const message = readErrorDetail(error.response?.data);
+    if (message) return message;
+    if (error.message) return error.message;
+  }
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  return fallback;
+}
+
 export interface DiagnoseParams {
   title: string;
   content: string;
@@ -67,6 +90,15 @@ export interface DiagnoseResult {
   optimized_title?: string;
   optimized_content?: string;
   cover_direction?: CoverDirection;
+}
+
+export interface BaselineResponse {
+  category: string;
+  stats: Record<string, unknown>;
+  avg_title_length?: number;
+  viral_avg_title_length?: number;
+  avg_tag_count?: number;
+  viral_rate?: number;
 }
 
 /**
@@ -145,7 +177,16 @@ export async function diagnoseStream(
   if (params.videoFile) fd.append("video_file", params.videoFile);
 
   const response = await fetch("/api/diagnose-stream", { method: "POST", body: fd });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) {
+    const raw = await response.text();
+    let message = `HTTP ${response.status}`;
+    try {
+      message = readErrorDetail(JSON.parse(raw)) ?? message;
+    } catch {
+      message = raw.trim() || message;
+    }
+    throw new Error(message);
+  }
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -174,8 +215,8 @@ export async function diagnoseStream(
 /**
  * 获取垂类 baseline 概览
  */
-export async function getBaseline(category: string) {
-  const { data } = await api.get(`/baseline/${category}`);
+export async function getBaseline(category: string): Promise<BaselineResponse> {
+  const { data } = await api.get<BaselineResponse>(`/baseline/${category}`);
   return data;
 }
 

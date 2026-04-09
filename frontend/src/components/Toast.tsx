@@ -1,25 +1,27 @@
-import { useState, useEffect } from "react";
-import { Snackbar, Alert } from "@mui/material";
+import { useEffect, useState } from "react";
+import { Alert, Snackbar } from "@mui/material";
+import type { AlertColor } from "@mui/material";
 
-let showToastFn: ((msg: string) => void) | null = null;
+type ToastPayload = {
+  message: string;
+  severity?: AlertColor;
+};
 
-/**
- * 全局 toast 触发函数
- */
-export function showToast(message: string) {
-  showToastFn?.(message);
+let showToastFn: ((payload: ToastPayload) => void) | null = null;
+
+export function showToast(message: string, severity: AlertColor = "success") {
+  showToastFn?.({ message, severity });
 }
 
-/**
- * Toast 容器（MUI Snackbar），放在 App 顶层即可
- */
 export default function ToastContainer() {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [severity, setSeverity] = useState<AlertColor>("success");
 
   useEffect(() => {
-    showToastFn = (msg: string) => {
-      setMessage(msg);
+    showToastFn = ({ message: nextMessage, severity: nextSeverity = "success" }) => {
+      setMessage(nextMessage);
+      setSeverity(nextSeverity);
       setOpen(true);
     };
     return () => {
@@ -30,13 +32,13 @@ export default function ToastContainer() {
   return (
     <Snackbar
       open={open}
-      autoHideDuration={2000}
+      autoHideDuration={2500}
       onClose={() => setOpen(false)}
       anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
     >
       <Alert
         onClose={() => setOpen(false)}
-        severity="success"
+        severity={severity}
         variant="filled"
         sx={{ borderRadius: 3 }}
       >

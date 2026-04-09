@@ -281,6 +281,7 @@ async def diagnose_note(
         category=category,
         tags=tag_list,
         cover_image=image_bytes,
+        image_count=len(parsed_images),
         video_analysis=video_analysis,
     )
     return report
@@ -399,6 +400,7 @@ async def diagnose_stream(
                     category=category,
                     tags=tag_list,
                     cover_image=image_bytes,
+                    image_count=len(parsed_images),
                     video_analysis=video_analysis,
                     progress_cb=_progress,
                 )

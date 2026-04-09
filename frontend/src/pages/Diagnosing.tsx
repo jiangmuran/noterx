@@ -1,537 +1,289 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { Box, Typography, useTheme, useMediaQuery } from "@mui/material";
-import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
-import { preScore, diagnoseStream, diagnoseNote } from "../utils/api";
-import type { DiagnoseResult, PreScoreResult, StreamEvent } from "../utils/api";
-import { saveHistory } from "../utils/api";
-import { FALLBACK_REPORT } from "../utils/fallback";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  LinearProgress,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
+import { diagnoseNote, diagnoseStream, getErrorMessage, preScore } from "../utils/api";
+import type { PreScoreResult, StreamEvent } from "../utils/api";
 
-/* ── Dimension labels ── */
-const DIM_LABELS: Record<string, string> = {
-  title_quality: "标题质量",
-  content_quality: "内容质量",
-  visual_quality: "视觉表现",
-  tag_strategy: "标签策略",
-  engagement_potential: "互动潜力",
-};
-
-const DIM_COLORS: Record<string, string> = {
-  title_quality: "#10b981",
-  content_quality: "#3b82f6",
-  visual_quality: "#f59e0b",
-  tag_strategy: "#8b5cf6",
-  engagement_potential: "#ff6b6b",
-};
-
-/* ── Steps ── */
 const STEPS = [
-  { label: "数据预评分", desc: "基于 874 条真实数据即时量化" },
-  { label: "解析笔记内容", desc: "提取标题、正文、标签信息" },
-  { label: "分析封面视觉", desc: "评估构图、色彩、文字占比" },
-  { label: "对比垂类数据", desc: "与数千条同类笔记基线对比" },
-  { label: "内容分析师诊断", desc: "评估文案结构与可读性" },
-  { label: "视觉诊断师诊断", desc: "分析封面视觉吸引力" },
-  { label: "增长策略师诊断", desc: "评估标签与发布策略" },
-  { label: "用户模拟器运行", desc: "模拟真实用户反应与评论" },
-  { label: "Agent 辩论交锋", desc: "4 位专家互相质疑与补充" },
-  { label: "综合裁判评定", desc: "汇总意见，给出最终诊断" },
-  { label: "生成诊断报告", desc: "整合评分、建议与优化方案" },
+  "初始化评分",
+  "解析标题和正文",
+  "分析封面素材",
+  "对比垂类基线",
+  "内容诊断",
+  "视觉诊断",
+  "增长诊断",
+  "用户反馈模拟",
+  "专家交叉评审",
+  "生成最终报告",
 ];
 
 const EVENT_STEP_MAP: Record<string, number> = {
   parse_start: 1,
   parse_done: 2,
   baseline_start: 3,
-  baseline_done: 3,
+  baseline_done: 4,
   round1_start: 4,
-  round1_content_done: 4,
-  round1_visual_done: 5,
-  round1_growth_done: 6,
-  round1_user_done: 7,
+  round1_content_done: 5,
+  round1_visual_done: 6,
+  round1_growth_done: 7,
+  round1_user_done: 8,
   round1_done: 8,
-  debate_start: 8,
-  debate_done: 9,
-  judge_start: 9,
+  debate_start: 9,
   judge_done: 10,
   finalizing: 10,
 };
-
-/* ── Tips per category ── */
-const TIPS: Record<string, string[]> = {
-  food: [
-    "美食爆款标题平均 18.3 字，标题权重占比 57.3%",
-    "食物特写封面比全景更容易吸引点击",
-    "17:00 是黄金发布时段（互动量是凌晨的 5658 倍）",
-    "最优标签数 4-8 个，6 个标签效果最佳",
-    "中等长度正文（100-300字）互动量最高",
-    "视频笔记互动量是图文的 2.25 倍",
-  ],
-  fashion: [
-    "穿搭品类 98.3% 的互动差异由视觉决定，文字几乎无效",
-    "爆款标题平均仅 14 字，简短精炼即可",
-    "评论区 63% 正面情绪，种草型用户占 25.4%",
-    "多图展示（2-10张）效果最好",
-    "穿搭封面建议：全身照 + 干净背景",
-  ],
-  tech: [
-    "科技品类图片数量是最强预测因子（β=0.41）",
-    "含数字的标题互动显著更高",
-    "长文在科技赛道有优势（87-517字最优）",
-    "经验型评论占 37%，科技用户爱分享心得",
-    "科技品类负面评论 27%，最高的品类",
-  ],
-  travel: [
-    "旅游品类标签是最强预测因子（β=0.52）",
-    "营销感标题反而降低互动（β=-0.51）",
-    "图片 4-14 张，需要多图展示",
-    "真实分享 > 套路标题",
-    "标题带天数+人均花费是黄金公式",
-  ],
-  _default: [
-    "3 个钩子元素最优（互动 21,132），4 个反而崩塌",
-    "视频笔记互动量是图文的 2.25 倍",
-    "17:00 是全品类黄金发布时段",
-    "标签数量 4-8 个最佳",
-    "Macro 作者互动是素人的 52 倍，但内容优化可缩小差距",
-  ],
-};
-
-/* ── Fun facts that rotate during wait ── */
-const FUN_FACTS = [
-  { q: "小红书互动量最高的一条笔记有多少互动？", a: "270,670！标题只用了情感+好奇心" },
-  { q: "凌晨 3 点和下午 5 点发笔记，互动量差多少倍？", a: "5,658 倍！同样的内容，发布时间决定生死" },
-  { q: "穿搭品类，文字能解释多少互动差异？", a: "只有 1.7%！剩余 98.3% 靠图片说话" },
-  { q: "有一条没有标题的笔记，互动量是多少？", a: "55,637！纯靠封面图的力量" },
-  { q: "评论区最高赞的一条评论有多少赞？", a: "39,000 赞！比绝大多数笔记还火" },
-  { q: "钩子元素越多越好吗？", a: "不是！3个最佳，4个反而崩塌到只有 5,826" },
-  { q: "我们分析了多少条真实评论？", a: "2,465 条，AI 分类成 6 种用户类型" },
-  { q: "科技品类头部笔记是均值的多少倍？", a: "24.4 倍！赢家通吃最严重的品类" },
-];
-
-/* (CATEGORY_LABEL removed — category shown via preScoreData.category_cn) */
-
-
-/* ── Agent status config ── */
-const AGENTS = [
-  { name: "content", label: "内容分析师", activeStep: 4, doneStep: 5 },
-  { name: "visual", label: "视觉诊断师", activeStep: 4, doneStep: 6 },
-  { name: "growth", label: "增长策略师", activeStep: 4, doneStep: 7 },
-  { name: "user", label: "用户模拟器", activeStep: 4, doneStep: 8 },
-  { name: "judge", label: "综合裁判", activeStep: 9, doneStep: 10 },
-];
-
-/* ── Score ring component ── */
-function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
-  const r = (size - 8) / 2;
-  const c = 2 * Math.PI * r;
-  const pct = score / 100;
-  const color = score >= 85 ? "#10b981" : score >= 70 ? "#f59e0b" : "#ff6b6b";
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f0f0f0" strokeWidth={6} />
-      <motion.circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={6}
-        strokeLinecap="round" strokeDasharray={c}
-        initial={{ strokeDashoffset: c }}
-        animate={{ strokeDashoffset: c * (1 - pct) }}
-        transition={{ duration: 1.2, ease: "easeOut" }}
-      />
-      <text
-        x={size / 2} y={size / 2 + 1}
-        textAnchor="middle" dominantBaseline="middle"
-        fill={color} fontSize={size * 0.28} fontWeight="800"
-        style={{ transform: "rotate(90deg)", transformOrigin: "center" }}
-      >
-        {Math.round(score)}
-      </text>
-    </svg>
-  );
-}
 
 export default function Diagnosing() {
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+
   const params = location.state as {
-    title: string; content: string; tags: string; category: string; coverFile: File | null; videoFile?: File | null;
+    title: string;
+    content: string;
+    tags: string;
+    category: string;
+    coverFile: File | null;
+    coverImages?: File[];
+    videoFile?: File | null;
   } | null;
 
   const [step, setStep] = useState(0);
-  const [tipIdx, setTipIdx] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [factIdx, setFactIdx] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("正在准备诊断...");
   const [preScoreData, setPreScoreData] = useState<PreScoreResult | null>(null);
-  const [streamMsg, setStreamMsg] = useState<string>("");
-  const apiDone = useRef(false);
-  const hasRealtimeProgress = useRef(false);
-  const resultRef = useRef<{ report: unknown; isFallback: boolean } | null>(null);
-
-  const tips = (params ? TIPS[params.category] : null) || TIPS._default;
+  const [fatalError, setFatalError] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = "诊断中... - 薯医 NoteRx";
-    if (!params) { navigate("/app"); return; }
+    document.title = "诊断中 - 钖尰 NoteRx";
+    if (!params) navigate("/app");
+  }, [navigate, params]);
+
+  useEffect(() => {
+    if (!params) return;
+
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    // Phase 1: Instant pre-score
-    preScore({
-      title: params.title, content: params.content,
-      category: params.category, tags: params.tags,
-      image_count: params.coverFile ? 1 : 0,
-    }).then((ps) => {
-      if (!cancelled) {
-        setPreScoreData(ps);
-        setStep(1); // Move past "数据预评分"
+    const run = async () => {
+      try {
+        const score = await preScore({
+          title: params.title,
+          content: params.content,
+          category: params.category,
+          tags: params.tags,
+          image_count: params.coverImages?.length ?? (params.coverFile ? 1 : 0),
+        });
+        if (!cancelled) {
+          setPreScoreData(score);
+          setStep(1);
+        }
+      } catch {
+        // Pre-score is an enhancement only.
       }
-    }).catch(() => {});
 
-    // Phase 2: Full diagnosis via SSE stream (fallback to normal POST)
-    (async () => {
+      timeoutId = setTimeout(() => {
+        if (!cancelled) {
+          setFatalError("诊断超时，请重试。");
+        }
+      }, 90000);
+
       try {
         await diagnoseStream(
           {
-            title: params.title, content: params.content,
-            category: params.category, tags: params.tags,
+            title: params.title,
+            content: params.content,
+            category: params.category,
+            tags: params.tags,
             coverImage: params.coverFile ?? undefined,
+            coverImages: params.coverImages,
             videoFile: params.videoFile ?? undefined,
           },
           (event: StreamEvent) => {
             if (cancelled) return;
+
             if (event.type === "pre_score") {
               setPreScoreData(event.data as unknown as PreScoreResult);
-              setStep(1);
-            } else if (event.type === "progress") {
-              hasRealtimeProgress.current = true;
-              setStreamMsg(event.data.message);
-              const mapped = EVENT_STEP_MAP[event.data.step];
-              if (mapped !== undefined) {
-                setStep((prev) => Math.max(prev, mapped));
+              setStep((prev) => Math.max(prev, 1));
+              return;
+            }
+
+            if (event.type === "progress") {
+              setStatusMessage(event.data.message);
+              const mappedStep = EVENT_STEP_MAP[event.data.step];
+              if (mappedStep !== undefined) {
+                setStep((prev) => Math.max(prev, mappedStep));
               }
-            } else if (event.type === "result") {
-              resultRef.current = { report: event.data, isFallback: false };
-              apiDone.current = true;
-            } else if (event.type === "error") {
-              console.warn("Stream error:", event.data.message);
+              return;
+            }
+
+            if (event.type === "error") {
+              setFatalError(event.data.message || "诊断失败，请重试。");
+              return;
+            }
+
+            if (event.type === "result") {
+              setStep(STEPS.length);
+              navigate("/report", { state: { report: event.data, params, isFallback: false } });
             }
           },
         );
-        // SSE completed
-        if (!resultRef.current) {
-          // Fallback to normal POST
-          const result = await diagnoseNote({
-            title: params.title, content: params.content,
-            category: params.category, tags: params.tags,
-            coverImage: params.coverFile ?? undefined,
-            videoFile: params.videoFile ?? undefined,
-          });
-          resultRef.current = { report: result, isFallback: false };
-        }
-      } catch (err) {
-        console.warn("SSE 不可用，降级到普通请求", err);
+      } catch (streamError) {
         try {
           const result = await diagnoseNote({
-            title: params.title, content: params.content,
-            category: params.category, tags: params.tags,
+            title: params.title,
+            content: params.content,
+            category: params.category,
+            tags: params.tags,
             coverImage: params.coverFile ?? undefined,
+            coverImages: params.coverImages,
             videoFile: params.videoFile ?? undefined,
           });
-          resultRef.current = { report: result, isFallback: false };
-        } catch {
-          resultRef.current = { report: FALLBACK_REPORT, isFallback: true };
+
+          if (!cancelled) {
+            setStep(STEPS.length);
+            navigate("/report", { state: { report: result, params, isFallback: false } });
+          }
+        } catch (noteError) {
+          if (!cancelled) {
+            setFatalError(getErrorMessage(noteError, getErrorMessage(streamError, "诊断失败，请重试。")));
+          }
         }
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
       }
-      apiDone.current = true;
-      if (!cancelled) {
-        saveHistory({ title: params.title, category: params.category, report: resultRef.current!.report as DiagnoseResult })
-          .catch(() => {});
-      }
-    })();
+    };
 
-    // Step timer (fills gaps between real events)
-    const stepTimer = setInterval(() => {
-      setStep((prev) => {
-        if (apiDone.current && prev >= STEPS.length - 2) {
-          clearInterval(stepTimer);
-          setTimeout(() => {
-            if (!cancelled && resultRef.current)
-              navigate("/report", { state: { report: resultRef.current.report, params, isFallback: resultRef.current.isFallback } });
-          }, 600);
-          return STEPS.length - 1;
-        }
-        if (hasRealtimeProgress.current) return prev;
-        if (prev >= STEPS.length - 1) return prev;
-        if (!apiDone.current && prev >= STEPS.length - 2) return prev;
-        return prev + 1;
-      });
-    }, 3500);
+    void run();
 
-    const tipTimer = setInterval(() => setTipIdx((p) => (p + 1) % tips.length), 4500);
-    const clockTimer = setInterval(() => setElapsed((p) => p + 1), 1000);
-    const factTimer = setInterval(() => { setFactIdx((p) => (p + 1) % FUN_FACTS.length); setShowAnswer(false); }, 8000);
+    const timer = setInterval(() => {
+      setElapsed((prev) => prev + 1);
+    }, 1000);
 
-    // Timeout: 90s fallback
-    const timeoutTimer = setTimeout(() => {
-      if (!apiDone.current && !cancelled) {
-        console.warn("诊断超时，使用 fallback");
-        resultRef.current = { report: FALLBACK_REPORT, isFallback: true };
-        apiDone.current = true;
-      }
-    }, 90000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [navigate, params]);
 
-    return () => { cancelled = true; clearInterval(stepTimer); clearInterval(tipTimer); clearInterval(clockTimer); clearInterval(factTimer); clearTimeout(timeoutTimer); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const progress = useMemo(() => Math.min(((step || 1) / STEPS.length) * 100, 100), [step]);
 
   if (!params) return null;
 
-  const progress = ((step + 1) / STEPS.length) * 100;
-
-  const currentStep = STEPS[Math.min(step, STEPS.length - 1)];
-
-  return (
-    <Box sx={{ position: "fixed", inset: 0, bgcolor: "#fff", display: "flex", flexDirection: "column" }}>
-
-      {/* ═══ Top bar ═══ */}
-      <Box sx={{
-        flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between",
-        px: { xs: 1.5, md: 3 }, height: 48,
-        borderBottom: "1px solid #f0f0f0",
-      }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, flex: 1 }}>
-          <motion.div
-            animate={{ opacity: [0.4, 1, 0.4] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            style={{ flexShrink: 0, display: "flex" }}
-          >
-            <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#ff2442" }} />
-          </motion.div>
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {params.title || "诊断中"}
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexShrink: 0, ml: 1.5 }}>
-          <Typography sx={{ fontSize: 12, color: "#bbb", display: { xs: "none", sm: "block" } }}>
-            {streamMsg || "预计 30-60s"}
-          </Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#555", fontVariantNumeric: "tabular-nums", bgcolor: "#f5f5f5", px: 1, py: 0.25, borderRadius: "6px" }}>
-            {elapsed}s
-          </Typography>
+  if (fatalError) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", px: 2 }}>
+        <Box sx={{ width: "100%", maxWidth: 520, bgcolor: "#fff", border: "1px solid #f0f0f0", borderRadius: "18px", p: 3 }}>
+          <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#262626", mb: 1.5 }}>诊断中断</Typography>
+          <Alert severity="error" sx={{ borderRadius: "12px", mb: 2 }}>
+            {fatalError}
+          </Alert>
+          <Box sx={{ display: "flex", gap: 1.5, flexDirection: isDesktop ? "row" : "column" }}>
+            <Button variant="contained" onClick={() => navigate("/app")} sx={{ flex: 1, background: "#ff2442", "&:hover": { background: "#e61e3d" } }}>
+              返回重试
+            </Button>
+            <Button variant="outlined" onClick={() => navigate("/history")} sx={{ flex: 1 }}>
+              查看历史
+            </Button>
+          </Box>
         </Box>
       </Box>
+    );
+  }
 
-      {/* ═══ Content ═══ */}
-      <Box sx={{ flex: 1, overflow: "auto", display: "flex", justifyContent: "center" }}>
-        <Box sx={{
-          width: "100%", maxWidth: 960,
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "300px 1fr" },
-          gap: { xs: 2.5, md: 4 },
-          px: { xs: 2, md: 3 },
-          py: { xs: 2.5, md: 3.5 },
-          alignContent: "start",
-          alignItems: "start",
-        }}>
+  return (
+    <Box sx={{ minHeight: "100vh", bgcolor: "#fff", display: "flex", flexDirection: "column" }}>
+      <Box sx={{ borderBottom: "1px solid #f0f0f0", px: { xs: 2, md: 3 }, py: 1.5 }}>
+        <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#262626" }}>正在诊断</Typography>
+        <Typography sx={{ fontSize: 12, color: "#999", mt: 0.5 }}>{params.title || "未命名笔记"}</Typography>
+      </Box>
 
-          {/* ═══ Left column: Score ═══ */}
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-            {/* Score ring or placeholder */}
-            <AnimatePresence mode="wait">
-              {preScoreData ? (
-                <motion.div key="ring" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.6 }}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
-                >
-                  <ScoreRing score={preScoreData.total_score} size={isDesktop ? 140 : 110} />
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", justifyContent: "center" }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                      {preScoreData.category_cn}品类
-                    </Typography>
-                    <Box sx={{
-                      px: 0.75, py: 0.2, borderRadius: "6px",
-                      bgcolor: preScoreData.total_score >= 85 ? "#dcfce7" : preScoreData.total_score >= 70 ? "#fef3c7" : "#fee2e2",
-                    }}>
-                      <Typography sx={{
-                        fontSize: 11, fontWeight: 700,
-                        color: preScoreData.total_score >= 85 ? "#16a34a" : preScoreData.total_score >= 70 ? "#d97706" : "#dc2626",
-                      }}>
-                        {preScoreData.level}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </motion.div>
-              ) : (
-                <motion.div key="ph" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
-                >
-                  <motion.div animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 2, repeat: Infinity }}>
-                    <Box sx={{
-                      width: isDesktop ? 140 : 110, height: isDesktop ? 140 : 110,
-                      borderRadius: "50%", border: "3px solid #f0f0f0",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      <Typography sx={{ fontSize: 14, color: "#ccc", fontWeight: 600 }}>评分中</Typography>
-                    </Box>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+      <Box sx={{ width: "100%", maxWidth: 900, mx: "auto", px: { xs: 2, md: 3 }, py: { xs: 3, md: 4 }, display: "grid", gridTemplateColumns: { xs: "1fr", md: "280px 1fr" }, gap: 3 }}>
+        <Box sx={{ bgcolor: "#fafafa", borderRadius: "18px", border: "1px solid #f0f0f0", p: 2.5, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
+          {preScoreData ? (
+            <>
+              <Typography sx={{ fontSize: 40, fontWeight: 900, color: preScoreData.total_score >= 75 ? "#16a34a" : "#f59e0b" }}>
+                {Math.round(preScoreData.total_score)}
+              </Typography>
+              <Typography sx={{ fontSize: 13, color: "#666", fontWeight: 700 }}>{preScoreData.category_cn}</Typography>
+              <Typography sx={{ fontSize: 12, color: "#999", textAlign: "center" }}>{preScoreData.level}</Typography>
+            </>
+          ) : (
+            <>
+              <CircularProgress size={40} sx={{ color: "#ff2442" }} />
+              <Typography sx={{ fontSize: 12, color: "#999" }}>正在初始化评分...</Typography>
+            </>
+          )}
+        </Box>
 
-            {/* Dimension bars — desktop: always show; mobile: only when data ready */}
-            {preScoreData && (
-              <Box sx={{ width: "100%", maxWidth: 280 }}>
-                {Object.entries(preScoreData.dimensions).map(([key, val]) => (
-                  <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.6, "&:last-child": { mb: 0 } }}>
-                    <Typography sx={{ fontSize: 11, color: "#999", minWidth: 44, textAlign: "right" }}>
-                      {DIM_LABELS[key] || key}
-                    </Typography>
-                    <Box sx={{ flex: 1, height: 5, bgcolor: "#f5f5f5", borderRadius: 3, overflow: "hidden" }}>
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${val}%` }}
-                        transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-                        style={{ height: "100%", borderRadius: 3, background: DIM_COLORS[key] || "#10b981" }}
-                      />
-                    </Box>
-                    <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#666", minWidth: 24, textAlign: "right" }}>
-                      {Math.round(val)}
-                    </Typography>
-                  </Box>
-                ))}
-                <Typography sx={{ fontSize: 10, color: "#ccc", mt: 1, textAlign: "center" }}>
-                  基于 {preScoreData.baseline.sample_size} 条数据
-                </Typography>
-              </Box>
-            )}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Box sx={{ bgcolor: "#fafafa", borderRadius: "18px", border: "1px solid #f0f0f0", p: 2.5 }}>
+            <Typography sx={{ fontSize: 20, fontWeight: 800, color: "#262626", mb: 1 }}>{STEPS[Math.max(step - 1, 0)]}</Typography>
+            <Typography sx={{ fontSize: 13, color: "#666", mb: 2 }}>{statusMessage}</Typography>
+            <LinearProgress
+              variant="determinate"
+              value={progress}
+              sx={{
+                height: 8,
+                borderRadius: 999,
+                bgcolor: "#f1f5f9",
+                "& .MuiLinearProgress-bar": { borderRadius: 999, backgroundColor: "#ff2442" },
+              }}
+            />
+            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}>
+              <Typography sx={{ fontSize: 11, color: "#999" }}>
+                {Math.min(step || 1, STEPS.length)} / {STEPS.length}
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: "#999" }}>{elapsed}s</Typography>
+            </Box>
           </Box>
 
-          {/* ═══ Right column: Progress + Engagement ═══ */}
-          <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
+          <Box sx={{ bgcolor: "#fafafa", borderRadius: "18px", border: "1px solid #f0f0f0", p: 2.5 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#262626", mb: 1.5 }}>处理步骤</Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {STEPS.map((label, index) => {
+                const done = index < step - 1;
+                const active = index === Math.max(step - 1, 0);
 
-            {/* Current step */}
-            <Box>
-              <AnimatePresence mode="wait">
-                <motion.div key={step} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
-                  <Typography sx={{ fontSize: { xs: 17, md: 20 }, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.01em" }}>
-                    {currentStep.label}
-                  </Typography>
-                  <Typography sx={{ fontSize: 13, color: "#999", mt: 0.25 }}>
-                    {currentStep.desc}
-                  </Typography>
-                </motion.div>
-              </AnimatePresence>
-            </Box>
-
-            {/* Agent strip */}
-            <Box sx={{ display: "flex", gap: { xs: 0.5, md: 0.75 }, flexWrap: "wrap" }}>
-              {AGENTS.map((agent, i) => {
-                const isDone = step >= agent.doneStep;
-                const isActive = !isDone && step >= agent.activeStep;
                 return (
-                  <motion.div key={agent.name}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.06, duration: 0.3 }}
-                  >
-                    <Box sx={{
-                      display: "flex", alignItems: "center", gap: 0.5,
-                      px: 1.25, py: 0.5, borderRadius: "20px",
-                      bgcolor: isDone ? "#f0fdf4" : isActive ? "#fff5f6" : "#f9f9f9",
+                  <Box
+                    key={label}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      px: 1.25,
+                      py: 0.9,
+                      borderRadius: "12px",
+                      bgcolor: done ? "#f0fdf4" : active ? "#fff1f2" : "#fff",
                       border: "1px solid",
-                      borderColor: isDone ? "#bbf7d0" : isActive ? "#fecaca" : "#eee",
-                      transition: "all 0.3s",
-                    }}>
-                      {isDone ? (
-                        <CheckCircleOutlinedIcon sx={{ fontSize: 13, color: "#16a34a" }} />
-                      ) : isActive ? (
-                        <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1, repeat: Infinity }}>
-                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#ff2442" }} />
-                        </motion.div>
-                      ) : (
-                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#ddd" }} />
-                      )}
-                      <Typography sx={{
-                        fontSize: 12, fontWeight: isDone || isActive ? 600 : 400,
-                        color: isDone ? "#16a34a" : isActive ? "#ff2442" : "#bbb",
-                      }}>
-                        {agent.label}
-                      </Typography>
-                    </Box>
-                  </motion.div>
+                      borderColor: done ? "#bbf7d0" : active ? "#fecdd3" : "#e5e7eb",
+                    }}
+                  >
+                    {done ? (
+                      <Box sx={{ width: 10, height: 10, borderRadius: "999px", bgcolor: "#16a34a" }} />
+                    ) : active ? (
+                      <CircularProgress size={12} thickness={6} sx={{ color: "#ff2442" }} />
+                    ) : (
+                      <Box sx={{ width: 10, height: 10, borderRadius: "999px", bgcolor: "#d1d5db" }} />
+                    )}
+                    <Typography sx={{ fontSize: 12, fontWeight: active || done ? 700 : 500, color: done ? "#166534" : active ? "#be123c" : "#6b7280" }}>
+                      {label}
+                    </Typography>
+                  </Box>
                 );
               })}
-            </Box>
-
-            {/* Progress bar */}
-            <Box>
-              <Box sx={{ height: 6, bgcolor: "#f5f5f5", borderRadius: 3, overflow: "hidden", position: "relative" }}>
-                <Box sx={{
-                  height: "100%", borderRadius: 3, bgcolor: "#ff2442",
-                  width: `${progress}%`,
-                  transition: "width 0.5s ease",
-                  position: "relative",
-                  "&::after": {
-                    content: '""', position: "absolute", inset: 0,
-                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-                    animation: "shimmer 2s infinite",
-                  },
-                }} />
-              </Box>
-              <Typography sx={{ fontSize: 11, color: "#ccc", mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
-                {step + 1} / {STEPS.length}
-              </Typography>
-            </Box>
-
-            {/* ── Divider ── */}
-            <Box sx={{ height: 1, bgcolor: "#f5f5f5" }} />
-
-            {/* Tips */}
-            <Box>
-              <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#10b981", mb: 0.75, letterSpacing: "0.04em" }}>
-                数据洞察
-              </Typography>
-              <AnimatePresence mode="wait">
-                <motion.div key={tipIdx} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                  <Typography sx={{ fontSize: { xs: 13, md: 14 }, color: "#555", lineHeight: 1.7 }}>
-                    {tips[tipIdx]}
-                  </Typography>
-                </motion.div>
-              </AnimatePresence>
-            </Box>
-
-            {/* Quiz */}
-            <Box
-              onClick={() => setShowAnswer(true)}
-              sx={{
-                p: 2, borderRadius: "14px", cursor: "pointer",
-                bgcolor: showAnswer ? "#fff5f6" : "#f9f9f9",
-                border: showAnswer ? "1px solid #fecaca" : "1px solid transparent",
-                transition: "all 0.3s",
-                "&:hover": { bgcolor: showAnswer ? "#fff5f6" : "#f5f5f5" },
-              }}
-            >
-              <Typography sx={{ fontSize: 11, fontWeight: 700, color: showAnswer ? "#ff2442" : "#bbb", mb: 0.5, letterSpacing: "0.04em" }}>
-                {showAnswer ? "答案揭晓" : "猜一猜"}
-              </Typography>
-              <AnimatePresence mode="wait">
-                <motion.div key={`${factIdx}-${showAnswer}`}
-                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
-                  <Typography sx={{
-                    fontSize: { xs: 14, md: 15 }, fontWeight: showAnswer ? 700 : 500,
-                    color: showAnswer ? "#ff2442" : "#1a1a1a", lineHeight: 1.6,
-                  }}>
-                    {showAnswer ? FUN_FACTS[factIdx].a : FUN_FACTS[factIdx].q}
-                  </Typography>
-                </motion.div>
-              </AnimatePresence>
-              {!showAnswer && (
-                <Typography sx={{ fontSize: 11, color: "#ccc", mt: 0.5 }}>点击揭晓</Typography>
-              )}
             </Box>
           </Box>
         </Box>
