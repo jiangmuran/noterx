@@ -521,7 +521,10 @@ export default function Home() {
   };
 
   const isReady = files.length > 0 && allRecognitionDone;
-  /* leaving animation removed — breaks browser back button */
+  const [leaving, setLeaving] = useState(false);
+
+  // Reset leaving on mount (browser back button fix)
+  useEffect(() => { setLeaving(false); }, []);
 
   return (
     <Box sx={{
@@ -531,6 +534,9 @@ export default function Home() {
       flexDirection: "column",
       bgcolor: "#faf9f7",
       overflow: { xs: "auto", md: "hidden" },
+      transition: "transform 0.35s ease, opacity 0.3s ease",
+      transform: leaving ? "translateY(-40px)" : "none",
+      opacity: leaving ? 0 : 1,
     }}>
 
       {/* ═══ Header — 所有信息压在一行 ═══ */}
@@ -563,7 +569,7 @@ export default function Home() {
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           <Button
-            onClick={() => { window.location.href = "/"; }}
+            onClick={() => { setLeaving(true); setTimeout(() => { window.location.href = "/"; }, 350); }}
             size="small"
             sx={{ color: "#999", fontSize: 12, fontWeight: 600, minWidth: "auto", px: 1, borderRadius: "8px",
               "&:hover": { color: "#ff2442", bgcolor: "#fff0f2" } }}
@@ -792,7 +798,6 @@ export default function Home() {
         )}
       </Box>
 
-      {/* transition overlay removed — caused browser back button to freeze */}
     </Box>
   );
 }
