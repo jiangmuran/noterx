@@ -71,19 +71,22 @@ _QUICK_PROMPT = """你是小红书截图分类与文字提取工具。
 - 下面是笔记网格缩略图
 
 ## 提取规则
-- title：**仅 content 类型**提取（页面顶部的笔记标题）。cover/comments/profile 一律留空 ""
-- content_text：**仅 content 类型**提取（段落正文+标签）。其他类型留空 ""
+- title：**仅 content 类型**提取（页面顶部的笔记标题）。cover/comments/profile 留空 ""
+- content_text：**仅 content 类型**提取（段落正文+标签）。注意：如果截图是长图的一部分（只有正文没有标题），也归为 content 类型，提取可见的正文。其他类型留空 ""
 - category：根据图片内容判断垂类（美食/穿搭/科技/旅行/生活）
 - summary：1-2句概括
 - extra_slots：同屏含评论区时 ["comments"]，否则 []
-- engagement_signal：从截图中可见的流量信号（如能看到点赞数、收藏数、评论数则提取）
-  - likes_visible：图中可见的点赞数（整数，看不到则 0）
-  - collects_visible：图中可见的收藏数（整数，看不到则 0）
-  - comments_visible：图中可见的评论数（整数，看不到则 0）
-  - is_high_engagement：如果可见互动数据较高（点赞>1000 或 收藏>500）则 true，否则 false
+- publisher：发布者信息（如能看到）
+  - name：发布者昵称（看不到则 ""）
+  - follower_count：粉丝数文本如"1.2万"（看不到则 ""）
+- engagement_signal：截图中可见的流量数据
+  - likes_visible：点赞数（整数，看不到则 0）
+  - collects_visible：收藏数（整数，看不到则 0）
+  - comments_visible：评论数（整数，看不到则 0）
+  - is_high_engagement：点赞>1000 或 收藏>500 时 true
 
 仅输出 JSON：
-{"slot_type": "cover|content|profile|comments|other", "extra_slots": [], "category": "", "title": "", "content_text": "", "summary": "", "confidence": 0.0, "engagement_signal": {"likes_visible": 0, "collects_visible": 0, "comments_visible": 0, "is_high_engagement": false}}"""
+{"slot_type": "cover|content|profile|comments|other", "extra_slots": [], "category": "", "title": "", "content_text": "", "summary": "", "confidence": 0.0, "publisher": {"name": "", "follower_count": ""}, "engagement_signal": {"likes_visible": 0, "collects_visible": 0, "comments_visible": 0, "is_high_engagement": false}}"""
 
 _VIDEO_QUICK_PROMPT = """你是小红书内容理解助手。用户上传了一段**视频**（可能是笔记录屏、Vlog、商品展示、成品笔记预览等）。
 

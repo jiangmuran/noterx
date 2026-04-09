@@ -302,6 +302,7 @@ export interface QuickRecognizeResult {
   summary: string;
   confidence?: number;
   error?: string;
+  publisher?: { name: string; follower_count: string };
   engagement_signal?: {
     likes_visible: number;
     collects_visible: number;

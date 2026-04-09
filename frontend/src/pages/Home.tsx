@@ -198,28 +198,57 @@ export default function Home() {
 
   const aggregated = useMemo(() => {
     let bestTitle = "";
-    let bestContent = "";
+    const contentParts: string[] = [];  // 合并多张图的正文
     let bestCategory = "";
     let bestSummary = "";
+    let publisherName = "";
+    let followerCount = 0;
+    let engLikes = 0, engCollects = 0, engComments = 0;
 
-    // 优先从 content 类型提取，但如果没有 content 类型，也从其他类型提取
+    // Pass 1: content 类型 — 标题取第一个, 正文全部合并
     for (const [, r] of successRecogEntries) {
       if ((r.slot_type || "").toLowerCase() === "content") {
         if (!bestTitle && r.title?.trim()) bestTitle = r.title.trim();
-        if (!bestContent && r.content_text?.trim()) bestContent = r.content_text.trim();
+        if (r.content_text?.trim()) contentParts.push(r.content_text.trim());
       }
       if (!bestCategory && r.category?.trim()) bestCategory = r.category.trim();
       if (!bestSummary && r.summary?.trim()) bestSummary = r.summary.trim();
-    }
-    // Fallback: 如果 content 类型没提取到，从任意类型取
-    if (!bestTitle || !bestContent) {
-      for (const [, r] of successRecogEntries) {
-        if (!bestTitle && r.title?.trim()) bestTitle = r.title.trim();
-        if (!bestContent && r.content_text?.trim()) bestContent = r.content_text.trim();
+      // 提取互动数据（取最大值）
+      const eng = r.engagement_signal;
+      if (eng) {
+        engLikes = Math.max(engLikes, eng.likes_visible || 0);
+        engCollects = Math.max(engCollects, eng.collects_visible || 0);
+        engComments = Math.max(engComments, eng.comments_visible || 0);
       }
     }
 
-    return { bestTitle, bestContent, bestCategory, bestSummary };
+    // Pass 2: fallback — 非 content 类型补充
+    if (!bestTitle) {
+      for (const [, r] of successRecogEntries) {
+        if (!bestTitle && r.title?.trim()) bestTitle = r.title.trim();
+      }
+    }
+    if (contentParts.length === 0) {
+      for (const [, r] of successRecogEntries) {
+        if (r.content_text?.trim()) contentParts.push(r.content_text.trim());
+      }
+    }
+
+    // 合并正文（去重：如果两段内容有50%以上重叠就跳过）
+    const mergedParts: string[] = [];
+    for (const part of contentParts) {
+      const isDuplicate = mergedParts.some((existing) => {
+        const shorter = part.length < existing.length ? part : existing;
+        return existing.includes(shorter.slice(0, 30)) || part.includes(existing.slice(0, 30));
+      });
+      if (!isDuplicate) mergedParts.push(part);
+    }
+    const bestContent = mergedParts.join("\n");
+
+    return {
+      bestTitle, bestContent, bestCategory, bestSummary,
+      engagementData: { likes: engLikes, collects: engCollects, comments: engComments },
+    };
   }, [successRecogEntries]);
 
   const imageFileKeys = useMemo(
