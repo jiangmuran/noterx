@@ -69,6 +69,19 @@ DEEP_PROMPTS = {
 }
 
 LINK_PATTERN = re.compile(r"https?://\S+", re.IGNORECASE)
+MIMO_MAX_COMPLETION_TOKENS = 131072
+OMNI_DEFAULT_MAX_COMPLETION_TOKENS = 32768
+
+
+def _read_token_cap(env_name: str, default_value: int) -> int:
+    raw = (os.getenv(env_name) or "").strip()
+    if not raw:
+        return max(0, min(default_value, MIMO_MAX_COMPLETION_TOKENS))
+    try:
+        value = int(raw)
+    except ValueError:
+        value = default_value
+    return max(0, min(value, MIMO_MAX_COMPLETION_TOKENS))
 
 
 def strip_links(text: str) -> str:
@@ -190,7 +203,10 @@ async def _vision_call(
     """调用多模态模型进行图片分析。"""
     b64 = base64.b64encode(image_bytes).decode("utf-8")
     resolved_model = model or os.getenv("LLM_MODEL_OMNI", "mimo-v2-omni")
-    out_cap = max_out_tokens if max_out_tokens is not None else 2048
+    if max_out_tokens is not None:
+        out_cap = max(0, min(int(max_out_tokens), MIMO_MAX_COMPLETION_TOKENS))
+    else:
+        out_cap = _read_token_cap("VISION_MAX_COMPLETION_TOKENS", OMNI_DEFAULT_MAX_COMPLETION_TOKENS)
     temperature = float(os.getenv("LLM_QUICK_RECOGNIZE_TEMPERATURE", "0.1"))
 
     def _build_kwargs(use_json_mode: bool) -> dict:
@@ -268,8 +284,8 @@ async def quick_recognize(
     quick_model = (os.getenv("LLM_MODEL_QUICK_RECOGNIZE") or "").strip() or os.getenv(
         "LLM_MODEL_OMNI", "mimo-v2-omni"
     )
-    quick_max_out = int(os.getenv("QUICK_RECOGNIZE_MAX_COMPLETION_TOKENS", "3000"))
-    ocr_cap = int(os.getenv("QUICK_RECOGNIZE_OCR_MAX_TOKENS", "3000"))
+    quick_max_out = _read_token_cap("QUICK_RECOGNIZE_MAX_COMPLETION_TOKENS", OMNI_DEFAULT_MAX_COMPLETION_TOKENS)
+    ocr_cap = _read_token_cap("QUICK_RECOGNIZE_OCR_MAX_TOKENS", OMNI_DEFAULT_MAX_COMPLETION_TOKENS)
 
     try:
         result = await _vision_call(

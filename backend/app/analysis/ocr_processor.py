@@ -13,6 +13,8 @@ import os
 from app.agents.base_agent import _is_mimo_openai_compat, _should_retry_openai_without_json_format
 
 logger = logging.getLogger("noterx.ocr")
+MIMO_MAX_COMPLETION_TOKENS = 131072
+OMNI_DEFAULT_MAX_COMPLETION_TOKENS = 32768
 
 
 def _parse_json_best_effort(raw: str) -> dict:
@@ -27,6 +29,17 @@ def _parse_json_best_effort(raw: str) -> dict:
         if left != -1 and right != -1 and right > left:
             return json.loads(clean[left : right + 1])
         raise
+
+
+def _read_token_cap(env_name: str, default_value: int) -> int:
+    raw = (os.getenv(env_name) or "").strip()
+    if not raw:
+        return max(0, min(default_value, MIMO_MAX_COMPLETION_TOKENS))
+    try:
+        value = int(raw)
+    except ValueError:
+        value = default_value
+    return max(0, min(value, MIMO_MAX_COMPLETION_TOKENS))
 
 
 class OCRProcessor:
@@ -78,10 +91,10 @@ class OCRProcessor:
                 ],
                 "temperature": temperature,
             }
-            env_cap = int(os.getenv("LLM_OCR_MAX_TOKENS", "4000"))
+            env_cap = _read_token_cap("LLM_OCR_MAX_TOKENS", OMNI_DEFAULT_MAX_COMPLETION_TOKENS)
             if max_tokens_override is not None:
-                env_cap = min(env_cap, max_tokens_override)
-            cap = min(env_cap, 4096)
+                env_cap = min(env_cap, max(0, min(int(max_tokens_override), MIMO_MAX_COMPLETION_TOKENS)))
+            cap = env_cap
             if _is_mimo_openai_compat():
                 kwargs["max_completion_tokens"] = cap
             else:

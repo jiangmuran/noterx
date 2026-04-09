@@ -12,6 +12,19 @@ from typing import Optional
 from app.agents.base_agent import _get_client, _is_mimo_openai_compat, _parse_json_from_llm_text
 
 logger = logging.getLogger("noterx.video_analyzer")
+MIMO_MAX_COMPLETION_TOKENS = 131072
+OMNI_DEFAULT_MAX_COMPLETION_TOKENS = 32768
+
+
+def _read_token_cap(env_name: str, default_value: int) -> int:
+    raw = (os.getenv(env_name) or "").strip()
+    if not raw:
+        return max(0, min(default_value, MIMO_MAX_COMPLETION_TOKENS))
+    try:
+        value = int(raw)
+    except ValueError:
+        value = default_value
+    return max(0, min(value, MIMO_MAX_COMPLETION_TOKENS))
 
 
 class VideoAnalyzer:
@@ -66,7 +79,10 @@ class VideoAnalyzer:
             ],
             "temperature": float(os.getenv("LLM_TEMPERATURE", "0.3")),
         }
-        max_out = int(os.getenv("LLM_MAX_COMPLETION_TOKENS", "1024"))
+        max_out = _read_token_cap(
+            "VIDEO_UNDERSTANDING_MAX_COMPLETION_TOKENS",
+            _read_token_cap("LLM_MAX_COMPLETION_TOKENS", OMNI_DEFAULT_MAX_COMPLETION_TOKENS),
+        )
         if _is_mimo_openai_compat():
             kwargs["max_completion_tokens"] = max_out
         else:
@@ -95,4 +111,3 @@ class VideoAnalyzer:
         parsed.setdefault("shot_style", "")
         parsed.setdefault("risk_or_limitations", [])
         return parsed
-
