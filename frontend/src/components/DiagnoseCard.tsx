@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { Box, Button } from "@mui/material";
 import ShareIcon from "@mui/icons-material/Share";
-import html2canvas from "html2canvas";
 import type { DiagnoseResult } from "../utils/api";
 
 interface Props {
@@ -15,6 +14,7 @@ export default function DiagnoseCard({ report, title }: Props) {
 
   const generateImage = async (): Promise<Blob | null> => {
     if (!cardRef.current) return null;
+    const { default: html2canvas } = await import("html2canvas");
     const canvas = await html2canvas(cardRef.current, {
       scale: 3,
       backgroundColor: "#ffffff",

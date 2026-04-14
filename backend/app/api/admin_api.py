@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse
 router = APIRouter()
 logger = logging.getLogger("noterx.admin")
 
-ADMIN_PASSWORD_SHA512 = "a776a66c6d2846ba069697bb56f68fedfe301a453126cf4af1d566296cd8ae903b591520c4fbb51592f1fa206b7a4c3baeb79a3dde67167a108b885835813cba"
+ADMIN_PASSWORD_SHA512 = "2edcf6be5d8b758e185c1e73d86430bf7c438a87aad4649e185845ddca7b19bdc340ea56e8c5d89e3c60d736d49665c8465567075d1715f3d4d186ee33e9dc9e"
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "baseline.db")
 _start_time = time.time()
 

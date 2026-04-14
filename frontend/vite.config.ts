@@ -8,7 +8,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const target = env.VITE_API_PROXY_TARGET || 'http://localhost:8000'
+
   return {
+    base: '/app/',
     plugins: [react()],
     server: {
       proxy: {
@@ -23,6 +25,23 @@ export default defineConfig(({ mode }) => {
         '/privacy': {
           target,
           changeOrigin: true,
+        },
+      },
+    },
+    build: {
+      target: 'es2020',
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('echarts')) return 'vendor-echarts'
+              if (id.includes('framer-motion')) return 'vendor-motion'
+              if (id.includes('@mui')) return 'vendor-mui'
+              if (id.includes('react-dom') || id.includes('react/') || id.includes('react-router')) return 'vendor-react'
+              if (id.includes('html2canvas')) return 'vendor-html2canvas'
+            }
+          },
         },
       },
     },
