@@ -217,7 +217,7 @@ export default function Report() {
             </Box>
             <Box sx={card}>
               <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626", mb: 2 }}>优化建议</Typography>
-              <SuggestionList suggestions={report.suggestions} />
+              <SuggestionList suggestions={report.suggestions || []} />
             </Box>
           </Box>
 
@@ -399,12 +399,12 @@ export default function Report() {
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "3fr 2fr" }, gap: sectionGap, mb: sectionGap }}>
             <Box sx={card}>
               <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626", mb: 2 }}>Agent 诊断详情</Typography>
-              <AgentDebate opinions={report.agent_opinions} summary={report.debate_summary} timeline={report.debate_timeline} />
+              <AgentDebate opinions={report.agent_opinions || []} summary={report.debate_summary || ""} timeline={report.debate_timeline || []} />
             </Box>
             <Box sx={card}>
               <Typography sx={{ fontWeight: 600, fontSize: 15, color: "#262626", mb: 2 }}>模拟评论区</Typography>
               <SimulatedComments
-                comments={report.simulated_comments}
+                comments={report.simulated_comments || []}
                 noteTitle={params.title}
                 noteContent={params.content || ""}
                 noteCategory={params.category}
@@ -425,6 +425,18 @@ export default function Report() {
           <motion.div {...sectionAnim(6)}>
           <Typography sx={{ textAlign: "center", fontSize: 12, color: "#ccc", mt: 3 }}>
             本报告由 AI 多 Agent 协作生成，仅供参考
+          </Typography>
+          <Typography sx={{ textAlign: "center", fontSize: 11, color: "#ccc", mt: 1 }}>
+            NoteRx 是公益开源项目 · 合作联系{" "}
+            <Typography component="a" href="mailto:jmr@jiangmuran.com"
+              sx={{ fontSize: 11, color: "#ddd", textDecoration: "none", fontWeight: 600, "&:hover": { color: "#ff2442" } }}>
+              jmr@jiangmuran.com
+            </Typography>
+            {" · "}
+            <Typography component="a" href="https://github.com/jiangmuran/noterx" target="_blank"
+              sx={{ fontSize: 11, color: "#ddd", textDecoration: "none", fontWeight: 600, "&:hover": { color: "#ff2442" } }}>
+              GitHub
+            </Typography>
           </Typography>
           </motion.div>
         </Box>

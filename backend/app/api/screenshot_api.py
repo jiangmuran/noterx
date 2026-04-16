@@ -71,52 +71,26 @@ SLOT_LABELS = {
     "comments": "评论区截图",
 }
 
-_QUICK_PROMPT = """你是小红书截图分类与文字提取工具。
+_QUICK_PROMPT = """分析这张小红书截图，判断类型并提取文字。
 
-## 铁律
-- 只提取图中实际可见的文字，严禁编造。看不清就留空""。
-- confidence 诚实反映把握程度。
-
-## 如何判断 slot_type（最关键！先判类型再提取）
-
-### cover（封面）的视觉特征：
-- 一张大图占满屏幕（照片/美图/产品图）
-- 可能叠加少量装饰文字（大号字、艺术字）
-- **没有**段落式正文，**没有**标签列表，**没有**评论列表
-- 底部可能有用户头像+昵称+点赞数
-
-### content（笔记详情页）的视觉特征：
-- 顶部有**笔记标题**（一行粗体文字）
-- 下面有**段落式正文**（多行文字，可能有emoji分段）
-- 底部通常有 **#标签** 列表
-- 可能有"编辑""发布"按钮（编辑态）
-
-### comments（评论区）的视觉特征：
-- 多条评论排列，每条有：头像圆形 + 昵称 + 评论文字 + 点赞数
-- 可能有"共XX条评论"标题
-- **不是**正文，不要把评论内容当成 content_text
-
-### profile（主页）的视觉特征：
-- 顶部有大头像 + 昵称 + 粉丝数/关注数/获赞数
-- 下面是笔记网格缩略图
+## slot_type 判断规则
+- cover：一张大图占满屏幕，没有段落正文，没有标签列表
+- content：有笔记标题（粗体）+ 段落正文 + #标签。长图续页（只有正文没标题）也算content
+- comments：多条评论列表（头像+昵称+评论文字）
+- profile：大头像+昵称+粉丝数+笔记网格
+- other：以上都不是
 
 ## 提取规则
-- title：**仅 content 类型**提取（页面顶部的笔记标题）。cover/comments/profile 留空 ""
-- content_text：**仅 content 类型**提取（段落正文+标签）。注意：如果截图是长图的一部分（只有正文没有标题），也归为 content 类型，提取可见的正文。其他类型留空 ""
-- category：根据图片内容判断垂类（美食/穿搭/科技/旅行/生活）
-- summary：1-2句概括
-- extra_slots：同屏含评论区时 ["comments"]，否则 []
-- publisher：发布者信息（如能看到）
-  - name：发布者昵称（看不到则 ""）
-  - follower_count：粉丝数文本如"1.2万"（看不到则 ""）
-- engagement_signal：截图中可见的流量数据
-  - likes_visible：点赞数（整数，看不到则 0）
-  - collects_visible：收藏数（整数，看不到则 0）
-  - comments_visible：评论数（整数，看不到则 0）
-  - is_high_engagement：点赞>1000 或 收藏>500 时 true
+- title：仅content类型提取笔记标题。其他类型留空""
+- content_text：仅content类型提取正文+标签。其他类型留空""
+- category：美食/穿搭/科技/旅行/生活
+- summary：1句概括
+- likes：图中可见的点赞数（整数，看不到则0）
 
-仅输出 JSON：
-{"slot_type": "cover|content|profile|comments|other", "extra_slots": [], "category": "", "title": "", "content_text": "", "summary": "", "confidence": 0.0, "publisher": {"name": "", "follower_count": ""}, "engagement_signal": {"likes_visible": 0, "collects_visible": 0, "comments_visible": 0, "is_high_engagement": false}}"""
+严禁编造！看不清就留空。
+
+输出JSON（不要嵌套，全部平铺）：
+{"slot_type":"","category":"","title":"","content_text":"","summary":"","confidence":0.0,"likes":0}"""
 
 _VIDEO_QUICK_PROMPT = """你是小红书内容理解助手。用户上传了一段**视频**（录屏、Vlog、步骤演示等）。
 
@@ -350,13 +324,32 @@ async def _vision_call(
     except asyncio.TimeoutError:
         return {"error": "视觉识别超时(60s)", "slot_type": "other"}
     raw = resp.choices[0].message.content or ""
+    # Try multiple JSON extraction strategies
     clean = raw.strip()
+    # 1) Remove markdown code fence
     if clean.startswith("```"):
         clean = clean.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    # 2) Direct parse
     try:
         return json.loads(clean)
     except json.JSONDecodeError:
-        return {"raw_text": raw, "error": "JSON解析失败"}
+        pass
+    # 3) Use enhanced parser from base_agent (handles thinking tags, raw_decode)
+    try:
+        from app.agents.base_agent import _parse_json_from_llm_text
+        return _parse_json_from_llm_text(raw)
+    except Exception:
+        pass
+    # 4) Last resort: find first { ... } manually
+    left = raw.find("{")
+    right = raw.rfind("}")
+    if left != -1 and right > left:
+        try:
+            return json.loads(raw[left:right + 1])
+        except json.JSONDecodeError:
+            pass
+    logger.warning("快识视觉JSON解析全部失败, 原始输出前300字: %s", raw[:300])
+    return {"raw_text": raw[:200], "error": "JSON解析失败"}
 
 
 def _sanitize_video_derived_title(result: dict) -> None:
@@ -455,6 +448,12 @@ def _normalize_quick_recognition_fields(
     slot_type = _normalize_slot_type(result.get("slot_type", ""))
     result["slot_type"] = slot_type
     result["extra_slots"] = _normalize_extra_slots(result.get("extra_slots"))
+    # Normalize flat likes/publisher into engagement_signal/publisher for frontend
+    if "likes" in result and "engagement_signal" not in result:
+        likes = int(result.pop("likes", 0) or 0)
+        result["engagement_signal"] = {"likes_visible": likes, "collects_visible": 0, "comments_visible": 0, "is_high_engagement": likes > 1000}
+    if "name" in result and "publisher" not in result:
+        result["publisher"] = {"name": result.pop("name", ""), "follower_count": result.pop("follower_count", "")}
     if is_video_frame_fallback and str(result.get("content_text", "")).strip():
         result["slot_type"] = "content"
         slot_type = "content"

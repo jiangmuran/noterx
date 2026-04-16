@@ -615,24 +615,18 @@ function go(e){
   return false;
 }
 
-// Reset launch overlay on page load — slide it away smoothly if stuck
-(function(){
+// Reset launch overlay — uses pageshow to catch bfcache (browser back button)
+window.addEventListener('pageshow', function(e){
   var o=document.getElementById('launch-overlay');
   if(!o)return;
-  // If overlay was fullscreen (user pressed back), slide it out
-  if(parseInt(o.style.width)>100||o.classList.contains('go')){
-    o.style.transition='transform 0.4s cubic-bezier(0.4,0,1,1), opacity 0.3s ease';
-    o.style.transform='translateY(-100vh)';
-    o.style.opacity='0';
-    setTimeout(function(){
-      o.style.transition='none';o.style.width='0';o.style.height='0';
-      o.style.transform='none';o.style.opacity='1';o.style.pointerEvents='none';
-      o.classList.remove('go');
-    },500);
-  } else {
-    o.style.transition='none';o.style.width='0';o.style.height='0';o.style.pointerEvents='none';o.classList.remove('go');
-  }
-})();
+  // Instant reset — no animation, just kill it
+  o.style.transition='none';
+  o.style.width='0';o.style.height='0';
+  o.style.top='0';o.style.left='0';
+  o.style.pointerEvents='none';
+  o.style.transform='none';o.style.opacity='1';
+  o.classList.remove('go');
+});
 
 // Counter animation
 var counted=false;

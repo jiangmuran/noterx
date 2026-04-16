@@ -1,147 +1,118 @@
-# 💊 薯医 NoteRx
+<div align="center">
 
-**AI驱动的小红书笔记诊断平台 —— 用数据告诉你，你的笔记为什么没火。**
+# 薯医 NoteRx
 
-> 你的笔记，值得被看见。
+### Multi-Agent Collaborative Diagnosis Engine for Xiaohongshu
 
-## 产品简介
+**Topic Star 榜单 #1** | 874 真实笔记训练 | 5 AI 专家三轮辩论 | 在线可用
 
-薯医（NoteRx）是一个面向小红书创作者的 AI 笔记诊断工具。用户可通过 **文字粘贴**、**截图上传（OCR 自动识别）** 或 **小红书链接导入** 三种方式提交笔记，平台通过 **多 Agent 辩论架构** 和 **真实数据 Baseline 对比**，从内容、视觉、增长策略、用户反应四个维度生成全面的诊断报告。
+<br>
 
-### 核心特色
+[**立即在线体验**](https://noterx.muran.tech) &nbsp;&nbsp;|&nbsp;&nbsp; [研究白皮书](https://noterx.muran.tech/) &nbsp;&nbsp;|&nbsp;&nbsp; [技术架构](#技术架构)
 
-- **多 Agent 辩论诊断**：5 个 AI 专家（内容分析师、视觉诊断师、增长策略师、用户模拟器、综合裁判）并行诊断，互相质疑，给出更全面准确的诊断
-- **量化 Baseline 对比**：基于数千条小红书笔记数据建立评价基线，用数据而非玄学给建议
-- **AI 模拟评论区**：预测真实用户看到笔记后的反应
-- **一键优化建议**：AI 生成优化标题、改写正文和封面方向建议，可一键复制
-- **辩论时间线**：可视化展示 Agent 之间的赞同、反驳和补充过程
-- **可分享诊断卡片**：一键导出精美诊断报告卡片，本身就是社交内容
-- **三种输入方式**：文字粘贴 / 截图 OCR / 小红书链接导入
-- **6 大垂类支持**：美食、穿搭、科技、旅行、美妆、健身
+<br>
 
-### 免责声明
+> 上传你的小红书笔记截图，5 位 AI 专家会像医生会诊一样，三轮辩论后给出量化诊断报告、可执行的优化方案、模拟评论区预测，以及一键生成的高分改写。
 
-本平台提供的诊断报告由 AI 多 Agent 协作生成，仅供参考，不构成任何运营承诺。
+</div>
 
-## 技术架构
+---
+
+## 为什么是薯医
+
+| | 传统工具 | 薯医 NoteRx |
+|---|---|---|
+| **评分依据** | 主观经验 / 单模型打分 | 874 条真实笔记回归分析 → 5 品类差异化权重 |
+| **诊断方式** | 单次 GPT 调用 | 5 Agent 并行诊断 → 交叉质疑辩论 → 裁判综合 |
+| **建议质量** | "提升标题吸引力" | "标题「XX」→改为「5分钟搞定！这道菜我妈做了20年」→加数字+情感+悬念" |
+| **评论预测** | 无 | AI 模拟真实评论区（含吵架/质疑/楼中楼） |
+| **优化闭环** | 给建议，用户自己改 | 自动生成 3 个高分改写方案 + 即时重新评分 |
+| **数据支撑** | 无 | Spearman 相关 · 线性回归 · K-Means 聚类 · LLM 深度分析 |
+
+## 在线体验
+
+**https://noterx.muran.tech**
+
+1. 打开链接 → 拖入小红书笔记截图（支持多张拼接）
+2. AI 自动识别标题、正文、分类（< 30s）
+3. 点击"开始诊断" → 观看 5 位 AI 专家实时辩论
+4. 获取完整报告：评分 · 雷达图 · 优化方案 · 模拟评论区 · 分享卡片
+
+手机电脑均可使用，无需注册。
+
+## 核心技术
+
+### 三大自训练模型
+
+| 模型 | 训练数据 | 能力 |
+|---|---|---|
+| **Model A — 量化预测引擎** | 874 条真实笔记 · 回归分析 | 5 品类差异化权重 · 5 维度即时评分 · < 50ms 无 LLM 调用 |
+| **Baseline Knowledge Graph — 基线知识图谱** | 874 笔记 + 2465 评论 · K-Means 聚类 | 品类爆款线 · 互动中位数 · 标签分布 · 发布时段热力图 |
+| **Comment Persona Engine — 评论画像引擎** | 2465 条真实评论 · LLM 分类 | 6 种用户画像（种草型/经验型/质疑型/凑热闹型/求助型/吐槽型）· 情绪分布 · 点赞预估 |
+
+### 四阶段诊断引擎
 
 ```
-前端 (React + TypeScript + Vite + Tailwind CSS + ECharts)
-  ↓
-API Gateway (FastAPI + Pydantic)
-  ↓
-┌──────────────────────────────────────────────┐
-│              多模态解析层                       │
-│  文本分析(jieba) | 图像分析(OpenCV) | OCR(LLM) │
-│  构图分析 | 色彩和谐度 | 视觉复杂度              │
-└──────────────────┬───────────────────────────┘
-                   ↓
-         Baseline 对比引擎 (SQLite)
-                   ↓
-┌──────────────────────────────────────────────┐
-│       多 Agent 编排引擎 (GPT-4o / Claude)      │
-│                                               │
-│  Round 1: 四Agent并行诊断                       │
-│    内容Agent | 视觉Agent | 增长Agent | 用户Agent │
-│                   ↓                           │
-│  Round 2: Agent 辩论 (赞同/反驳/补充)            │
-│                   ↓                           │
-│  Round 3: 综合裁判Agent → 最终报告 + 优化建议     │
-└──────────────────────────────────────────────┘
+Stage 1                    Stage 2                Stage 3                    Stage 4
+数据驱动基线训练      →     Model A 智能初评    →   多智能体深度辩论        →    AI 优化闭环
+                                                                              
+874 笔记 + 2465 评论       5 维度即时打分          4 Agent 并行诊断            自动生成 3 个优化方案
+Spearman / 回归 / 聚类     < 50ms 无 LLM          交叉质疑 · 补充论据         即时重新评分
+5 品类差异化权重            品类差异化基线          裁判 Agent 综合裁定         最高分方案推荐
 ```
+
+### Multi-Agent 辩论架构
+
+```
+Round 1: 并行诊断                    Round 2: 交叉辩论                Round 3: 综合裁判
+                                                                    
+[内容分析师] ─┐                      内容 ←→ 视觉                     ┌─→ 最终评分
+[视觉诊断师] ─┤→ 独立诊断 + 评分     视觉 ←→ 增长      质疑/反驳      ├─→ 优化标题 + 正文
+[增长策略师] ─┤                      增长 ←→ 用户      赞同/补充      ├─→ 封面方向建议
+[用户模拟器] ─┘                      用户 ←→ 内容                     └─→ 模拟评论区
+```
+
+### 技术栈
+
+| 层 | 技术 |
+|---|---|
+| **前端** | React 19 · TypeScript · MUI v9 · Framer Motion · ECharts · Vite |
+| **后端** | FastAPI · asyncio · SSE 流式推送 · SQLite |
+| **AI** | MiMo-v2-Pro（诊断）· MiMo-v2-Omni（多模态视觉）· MiMo-v2-Flash（快速任务） |
+| **分析** | jieba 分词 · OpenCV 图像分析 · OCR 文字提取 · 视频首帧/听写 |
+| **研究** | Spearman 相关 · 线性回归 · K-Means 聚类 · PCA 可视化 |
+
+## 产品功能
+
+- **多模态输入**：截图拖入 / Ctrl+V 粘贴 / 视频上传，AI 自动识别标题、正文、分类
+- **实时诊断动画**：11 步时间线 + 辩论实况气泡 + Agent 状态跟踪
+- **五维雷达评分**：内容质量 · 视觉表现 · 增长策略 · 互动潜力 · 综合评分
+- **AI 模拟评论区**：真实 XHS 风格（含吵架/质疑/楼中楼），预估点赞数
+- **迭代优化引擎**：一键生成 3 个高分改写方案，自动评分 + 最高分推荐
+- **基线对比**：与同品类数千条笔记对比（标题字数 / 标签数 / 爆款率）
+- **分享卡片**：一键生成带品牌水印的诊断卡片，支持系统分享到微信/小红书
+- **诊断历史**：本地 IndexedDB 存储，隐私安全
 
 ## 快速开始
 
-### 环境要求
-
-- Node.js >= 18
-- Python >= 3.9
-- OpenAI API Key (GPT-4o) 或 Anthropic API Key (Claude)
-
-### 安装与运行
-
 ```bash
-# 1. 克隆项目
-git clone https://github.com/your-repo/noterx.git
-cd noterx
+# 克隆
+git clone https://github.com/jiangmuran/noterx.git && cd noterx
 
-# 2. 配置环境变量
-cp .env.example backend/.env
-# 编辑 backend/.env，填入你的 API Key
+# 配置
+cp .env.example backend/.env  # 编辑填入 API Key
 
-# 3. 安装依赖 + 初始化数据库（一键）
-make install && make data
-
-# 4. 一键启动
-./start.sh
+# 一键安装 + 启动
+make install && make data && ./start.sh
 ```
 
-访问 `http://localhost:5173` 开始使用。
-
-### 手动启动
-
-```bash
-# 后端
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-
-# 前端（新终端）
-cd frontend
-npm install
-npm run dev
-```
-
-### Makefile 快捷命令
-
-| 命令 | 作用 |
-|------|------|
-| `make install` | 安装前后端所有依赖 |
-| `make data` | 初始化数据库 + 种子数据 + 计算 baseline |
-| `make test` | 运行后端 pytest 测试 |
-| `make ci` | 完整 CI 流程（前端构建 + 后端测试） |
-
-## 项目结构
-
-```
-noterx/
-├── frontend/                 # React 前端
-│   └── src/
-│       ├── components/       # UI 组件（Toast、ErrorBoundary、RadarChart 等）
-│       ├── pages/            # 页面（首页/诊断动画/报告）
-│       └── utils/            # API 工具、类型和 fallback 数据
-├── backend/                  # Python 后端
-│   ├── app/
-│   │   ├── api/              # FastAPI 路由（diagnose、baseline、link 解析）
-│   │   ├── agents/           # 多 Agent 模块 + 编排器
-│   │   │   └── prompts/      # Agent System Prompt + 辩论 Prompt
-│   │   ├── analysis/         # 多模态分析（文本/图像/OCR/构图）
-│   │   ├── baseline/         # Baseline 对比引擎
-│   │   ├── models/           # Pydantic 数据模型
-│   │   └── utils/            # 工具模块（链接解析器等）
-│   ├── data/                 # SQLite 数据库（gitignore）
-│   └── tests/                # 后端单元测试
-├── scripts/                  # 数据初始化脚本
-├── docs/                     # 项目文档
-├── .github/workflows/        # GitHub Actions CI
-├── Makefile                  # 开发快捷命令
-└── start.sh                  # 一键启动脚本
-```
-
-## API 接口
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `POST` | `/api/diagnose` | 笔记诊断（multipart/form-data） |
-| `GET` | `/api/baseline/{category}` | 获取垂类 baseline 数据 |
-| `POST` | `/api/parse-link` | 解析小红书分享链接 |
-| `GET` | `/api/health` | 健康检查（含数据库状态） |
+访问 `http://localhost:5173`
 
 ## 团队
 
-**PageOne** — 五个13岁的创作者，用AI解决自己的问题。
+**PageOne** — 全场唯一中学生队伍。四个 13 岁的初中生，从零完成数据采集、模型训练、全栈开发到生产部署，48 小时交付完整产品。
+
+姜睦然 · 杨曦哲 · 陈宇夏 · 吕思彤
 
 ## License
 
@@ -149,4 +120,10 @@ Apache License 2.0
 
 ---
 
-*小红书黑客松巅峰赛作品 #小红书黑客松巅峰赛*
+<div align="center">
+
+**[立即体验 →](https://noterx.muran.tech)**
+
+*小红书黑客松巅峰赛 · Topic Star #1*
+
+</div>

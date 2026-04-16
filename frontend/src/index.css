@@ -57,6 +57,18 @@ img {
   display: block;
 }
 
+/* Remove tap highlight and focus outline on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+*:focus {
+  outline: none;
+}
+*:focus-visible {
+  outline: 2px solid #ff2442;
+  outline-offset: 2px;
+}
+
 /* ── Shimmer animation for progress bars ── */
 @keyframes shimmer {
   0% { transform: translateX(-100%); }

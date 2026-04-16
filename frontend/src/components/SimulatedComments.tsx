@@ -51,7 +51,7 @@ function toCommentState(c: SimulatedComment | CommentWithReplies): CommentState 
 }
 
 export default function SimulatedComments({ comments: initial, noteTitle = "", noteContent = "", noteCategory = "food" }: Props) {
-  const [comments, setComments] = useState<CommentState[]>(() => initial.map(toCommentState));
+  const [comments, setComments] = useState<CommentState[]>(() => (initial || []).map(toCommentState));
   const [loading, setLoading] = useState(false);
 
   const toggleLike = useCallback((idx: number) => {
