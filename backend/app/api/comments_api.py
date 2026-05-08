@@ -51,6 +51,12 @@ class GenerateCommentsRequest(BaseModel):
 @router.post("/generate-comments")
 async def generate_comments(req: GenerateCommentsRequest):
     """用 flash 模型快速生成更多模拟评论"""
+    if len(req.title) > 200:
+        req.title = req.title[:200]
+    if len(req.content) > 5000:
+        req.content = req.content[:5000]
+    if len(req.category) > 50:
+        req.category = req.category[:50]
     category_names = {"food": "美食", "fashion": "穿搭", "tech": "科技",
                       "travel": "旅行", "beauty": "美妆", "fitness": "健身"}
     cat_cn = category_names.get(req.category, req.category)

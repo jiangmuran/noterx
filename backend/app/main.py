@@ -4,9 +4,10 @@ NoteRx 后端入口
 import logging
 import os
 import sqlite3
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -17,6 +18,26 @@ from app import local_memory
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "baseline.db")
+
+_MAX_REQUEST_BODY_MB = int(os.getenv("MAX_REQUEST_BODY_MB", "350"))
+_MAX_REQUEST_BODY_BYTES = max(1, min(_MAX_REQUEST_BODY_MB, 2048)) * 1024 * 1024
+
+_RATE_LIMIT_WINDOW = int(os.getenv("API_RATE_LIMIT_WINDOW_SEC", "60"))
+_RATE_LIMIT_MAX = int(os.getenv("API_RATE_LIMIT_PER_WINDOW", "30"))
+_DIAGNOSE_RATE_LIMIT = int(os.getenv("DIAGNOSE_RATE_LIMIT_PER_WINDOW", "8"))
+_rate_limit_store: dict[str, list[float]] = {}
+
+
+def _check_rate_limit(identifier: str, window: int, max_req: int) -> bool:
+    now = time.time()
+    if identifier not in _rate_limit_store:
+        _rate_limit_store[identifier] = []
+    timestamps = _rate_limit_store[identifier]
+    timestamps[:] = [ts for ts in timestamps if now - ts < window]
+    if len(timestamps) >= max_req:
+        return False
+    timestamps.append(now)
+    return True
 
 
 def _ensure_history_table():
@@ -93,14 +114,53 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://noterx.muran.tech",
+        os.getenv("CORS_ORIGIN_OVERRIDE", "").strip() or "https://noterx.muran.tech",
         "http://localhost:5173",
         "http://localhost:5174",
     ],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
 )
+
+# ── Rate limiting middleware ──
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/admin"):
+            return await call_next(request)
+        if not path.startswith("/api"):
+            return await call_next(request)
+        ip = request.client.host if request.client else "unknown"
+        if path in ("/api/diagnose", "/api/diagnose-stream", "/api/optimize", "/api/screenshot/quick-recognize"):
+            max_req = _DIAGNOSE_RATE_LIMIT
+        else:
+            max_req = _RATE_LIMIT_MAX
+        if not _check_rate_limit(ip, _RATE_LIMIT_WINDOW, max_req):
+            raise HTTPException(429, "请求过于频繁，请稍后重试")
+        return await call_next(request)
+
+app.add_middleware(RateLimitMiddleware)
+
+# ── Request body size limit middleware ──
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if not path.startswith("/api"):
+            return await call_next(request)
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                cl = int(content_length)
+                if cl > _MAX_REQUEST_BODY_BYTES:
+                    raise HTTPException(413, f"请求体超过 {_MAX_REQUEST_BODY_MB}MB 限制")
+            except ValueError:
+                pass
+        return await call_next(request)
+
+app.add_middleware(BodySizeLimitMiddleware)
 
 app.include_router(api_router, prefix="/api")
 
@@ -150,8 +210,6 @@ async def serve_privacy():
 SPA_ROUTES = {"/app", "/diagnosing", "/report", "/history", "/screenshot"}
 
 if os.path.isdir(FRONTEND_DIST):
-    from starlette.middleware.base import BaseHTTPMiddleware
-
     class SPAMiddleware(BaseHTTPMiddleware):
         """Serve SPA index.html for /app and its sub-routes"""
         async def dispatch(self, request, call_next):
