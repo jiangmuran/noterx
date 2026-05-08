@@ -4,6 +4,7 @@
 import json
 import logging
 import os
+import re
 import sqlite3
 import uuid
 
@@ -16,6 +17,12 @@ router = APIRouter()
 logger = logging.getLogger("noterx.history")
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "baseline.db")
+_RECORD_ID_RE = re.compile(r"^[a-f0-9]{32}$")
+
+
+def _vali_date_record_id(record_id: str) -> None:
+    if not _RECORD_ID_RE.fullmatch(record_id):
+        raise HTTPException(400, "无效的记录 ID")
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -103,6 +110,7 @@ async def get_history(record_id: str):
     获取单条历史记录详情（含完整报告）。
     @param record_id - UUID
     """
+    _vali_date_record_id(record_id)
     conn = _get_conn()
     try:
         row = conn.execute(
@@ -133,6 +141,7 @@ async def delete_history(record_id: str):
     删除一条历史记录。
     @param record_id - UUID
     """
+    _vali_date_record_id(record_id)
     conn = _get_conn()
     try:
         cur = conn.execute("DELETE FROM diagnosis_history WHERE id = ?", (record_id,))

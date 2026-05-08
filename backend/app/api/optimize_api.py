@@ -52,6 +52,12 @@ class OptimizeRequest(BaseModel):
 @router.post("/optimize")
 async def optimize(req: OptimizeRequest):
     """生成2-3个优化方案并自动评分"""
+    if len(req.title) > 200:
+        req.title = req.title[:200]
+    if len(req.content) > 10000:
+        req.content = req.content[:10000]
+    if len(req.category) > 50:
+        req.category = req.category[:50]
     issues_text = req.issues[:500] if req.issues else "无具体扣分项"
     suggestions_text = req.suggestions[:500] if req.suggestions else ""
 

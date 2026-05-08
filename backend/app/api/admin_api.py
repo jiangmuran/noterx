@@ -4,29 +4,59 @@
 from __future__ import annotations
 
 import hashlib
+import hmac as _hmac_mod
 import logging
 import os
 import sqlite3
 import time
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import HTMLResponse
 
 router = APIRouter()
 logger = logging.getLogger("noterx.admin")
 
-ADMIN_PASSWORD_SHA512 = "2edcf6be5d8b758e185c1e73d86430bf7c438a87aad4649e185845ddca7b19bdc340ea56e8c5d89e3c60d736d49665c8465567075d1715f3d4d186ee33e9dc9e"
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "baseline.db")
 _start_time = time.time()
 
 
+def _get_password_hash() -> str:
+    env_hash = (os.getenv("ADMIN_PASSWORD_SHA512", "")).strip()
+    if env_hash:
+        return env_hash
+    admin_password = (os.getenv("ADMIN_PASSWORD", "")).strip()
+    if admin_password:
+        return hashlib.sha512(admin_password.encode()).hexdigest()
+    logger.critical("ADMIN_PASSWORD_SHA512 or ADMIN_PASSWORD env var not set; admin panel unavailable")
+    return ""
+
+
 def _verify_password(password: str) -> bool:
-    import hmac
-    return hmac.compare_digest(
+    stored = _get_password_hash()
+    if not stored:
+        return False
+    return _hmac_mod.compare_digest(
         hashlib.sha512(password.encode()).hexdigest(),
-        ADMIN_PASSWORD_SHA512,
+        stored,
     )
+
+
+_ADMIN_RATE_LIMIT: dict[str, list[float]] = {}
+
+
+def _check_admin_rate_limit(identifier: str) -> bool:
+    now = time.time()
+    max_attempts = int(os.getenv("ADMIN_MAX_ATTEMPTS_PER_WINDOW", "8"))
+    window_sec = int(os.getenv("ADMIN_RATE_LIMIT_WINDOW_SEC", "300"))
+    if identifier not in _ADMIN_RATE_LIMIT:
+        _ADMIN_RATE_LIMIT[identifier] = []
+    timestamps = _ADMIN_RATE_LIMIT[identifier]
+    timestamps[:] = [ts for ts in timestamps if now - ts < window_sec]
+    if len(timestamps) >= max_attempts:
+        return False
+    timestamps.append(now)
+    return True
 
 
 def _get_stats() -> dict:
@@ -199,8 +229,10 @@ function showLogin(err){
 }
 async function doLogin(){
   const pw=document.getElementById('pw').value;
-  try{const r=await fetch('/admin/api/stats?password='+encodeURIComponent(pw));
-  if(!r.ok){showLogin('密码错误');return;}token=pw;showDash(await r.json());}catch(e){showLogin('连接失败');}
+  try{
+    const r=await fetch('/admin/api/stats',{headers:{'Authorization':'Bearer '+pw}});
+    if(!r.ok){showLogin('密码错误');return;}token=pw;showDash(await r.json());
+  }catch(e){showLogin('连接失败');}
 }
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function showDash(d){
@@ -251,10 +283,11 @@ function showDash(d){
 }
 async function doRefresh(){
   if(!token)return;
-  try{const r=await fetch('/admin/api/stats?password='+encodeURIComponent(token));
-  if(r.ok)showDash(await r.json());}catch(e){}
+  try{
+    const r=await fetch('/admin/api/stats',{headers:{'Authorization':'Bearer '+token}});
+    if(r.ok)showDash(await r.json());
+  }catch(e){}
 }
-// Auto-refresh every 30s
 setInterval(()=>{if(token)doRefresh();},30000);
 showLogin();
 </script></body></html>"""
@@ -262,11 +295,21 @@ showLogin();
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_page():
+    if not _get_password_hash():
+        raise HTTPException(503, "管理员面板未配置。请设置 ADMIN_PASSWORD_SHA512 或 ADMIN_PASSWORD 环境变量。")
     return ADMIN_HTML
 
 
 @router.get("/admin/api/stats")
-async def admin_stats(password: str = Query(...)):
-    if not _verify_password(password):
+async def admin_stats(request: Request, authorization: str = Header("")):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(401, "需要 Bearer token 认证")
+    token = authorization[7:]
+    if not token:
+        raise HTTPException(401, "需要 Bearer token 认证")
+    if not _verify_password(token):
+        identifier = request.client.host if request.client else "unknown"
+        if not _check_admin_rate_limit(identifier):
+            raise HTTPException(429, "请求过于频繁，请稍后重试")
         raise HTTPException(403, "密码错误")
     return _get_stats()
