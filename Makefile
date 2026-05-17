@@ -2,9 +2,7 @@
 
 # 一键初始化数据库并生成 baseline
 data:
-	python3 scripts/init_db.py
-	python3 scripts/seed_data.py
-	python3 scripts/compute_baseline.py
+	@echo "数据库表 / 种子数据 / 基线指标 已由 init_database() 自动处理"
 
 # 安装所有依赖
 install:

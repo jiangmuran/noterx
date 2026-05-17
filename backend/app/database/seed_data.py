@@ -1,16 +1,8 @@
-"""
-生成模拟 baseline 种子数据用于开发和演示。
-实际比赛前应替换为真实采集的小红书笔记数据。
-
-Usage:
-    python scripts/seed_data.py
-"""
 import sqlite3
 import json
 import random
-import os
+from pathlib import Path
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "backend", "data", "baseline.db")
 
 FOOD_TITLES = [
     "手把手教你做日式溏心蛋！零失败！", "一周减脂餐分享｜好吃不胖",
@@ -41,7 +33,7 @@ TECH_TITLES = [
     "这个APP改变了我的学习方式", "数码产品年度盘点｜好用到哭",
     "iPad学习法｜从学渣到学霸", "耳机横评｜千元内最值得买的5款",
     "NAS入门指南｜打造私人云存储", "手机摄影技巧｜拍出电影质感",
-    "机械键盘入坑指南｜新手必看", "二手数码避坑指南‼️", 
+    "机械键盘入坑指南｜新手必看", "二手数码避坑指南‼️",
     "AI工具合集｜效率提升10倍", "极简桌面布置｜打造高效工作台",
 ]
 
@@ -153,12 +145,15 @@ def generate_notes(category, titles, tags_pool, count=500):
     return notes
 
 
-def seed():
-    """写入种子数据"""
-    conn = sqlite3.connect(DB_PATH)
+def seed_data(db_path: Path):
+    """若 notes 表为空，则填充种子数据"""
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM notes")
+    cursor.execute("SELECT COUNT(*) FROM notes")
+    if cursor.fetchone()[0] > 0:
+        conn.close()
+        return
 
     all_notes = []
     all_notes.extend(generate_notes("food", FOOD_TITLES, FOOD_TAGS, 500))
@@ -181,7 +176,3 @@ def seed():
     conn.commit()
     print(f"已插入 {len(all_notes)} 条种子数据")
     conn.close()
-
-
-if __name__ == "__main__":
-    seed()

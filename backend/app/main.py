@@ -3,7 +3,7 @@ NoteRx 后端入口
 """
 import logging
 import os
-import sqlite3
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,69 +13,17 @@ from fastapi.responses import FileResponse
 
 from app.api.routes import router as api_router
 from app import local_memory
+from app.database import init_database
 
+DB_PATH = Path(__file__).parent.parent.parent / "data" / "baseline.db"
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
-
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "baseline.db")
-
-
-def _ensure_history_table():
-    """启动时自动创建 diagnosis_history 表（如不存在）"""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS diagnosis_history (
-            id TEXT PRIMARY KEY,
-            title TEXT NOT NULL,
-            category TEXT NOT NULL,
-            overall_score REAL,
-            grade TEXT,
-            report_json TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_history_created
-        ON diagnosis_history(created_at DESC)
-    """)
-    # Usage tracking table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS usage_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ip TEXT NOT NULL,
-            action TEXT NOT NULL DEFAULT 'diagnose',
-            title TEXT DEFAULT '',
-            category TEXT DEFAULT '',
-            total_tokens INTEGER DEFAULT 0,
-            duration_sec REAL DEFAULT 0,
-            status TEXT DEFAULT 'ok',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_log(created_at DESC)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_usage_ip ON usage_log(ip)")
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS visit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            visitor_hash TEXT NOT NULL,
-            user_agent_hash TEXT DEFAULT '',
-            path TEXT NOT NULL,
-            referrer TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_visit_created ON visit_log(created_at DESC)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_visit_visitor ON visit_log(visitor_hash)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_visit_path ON visit_log(path)")
-    conn.commit()
-    conn.close()
-    local_memory.ensure_memory_md()
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """应用生命周期：启动时自动建表"""
-    _ensure_history_table()
+    init_database(DB_PATH)
+    local_memory.ensure_memory_md()
     yield
 
 logging.basicConfig(
@@ -178,12 +126,10 @@ if os.path.isdir(FRONTEND_DIST):
 async def health():
     """详细健康检查，含数据库探测"""
     import sqlite3
-    import os
-    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "baseline.db")
     db_ok = False
     note_count = 0
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM notes")
         note_count = cur.fetchone()[0]
