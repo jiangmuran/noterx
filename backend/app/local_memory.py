@@ -12,10 +12,11 @@ import json
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 
 logger = logging.getLogger("noterx.local_memory")
 
-_DATA_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
+_DATA_ROOT = Path(__file__).parent.parent.parent / "data"
 WORKSPACE_ROOT = os.path.join(_DATA_ROOT, "noterx_workspace")
 MEMORY_MD = os.path.join(WORKSPACE_ROOT, "MEMORY.md")
 MEMORY_DIR = os.path.join(WORKSPACE_ROOT, "memory")

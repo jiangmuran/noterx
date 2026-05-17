@@ -1,15 +1,7 @@
-"""
-基于 notes 表数据，预计算各垂类的 baseline 统计指标并写入 baseline_stats 表。
-
-Usage:
-    python scripts/compute_baseline.py
-"""
 import sqlite3
 import json
-import os
 from collections import Counter
-
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "backend", "data", "baseline.db")
+from pathlib import Path
 
 
 def upsert_stat(cursor, category, metric_name, metric_value=None, metric_json=None):
@@ -174,12 +166,15 @@ def compute_for_category(cursor, category):
     print(f"  [{category}] 已计算 baseline 指标（含粉丝分层与标签分桶）")
 
 
-def main():
+def compute_baseline(db_path: Path):
     """计算所有垂类的 baseline 统计指标"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM baseline_stats")
+    cursor.execute("SELECT COUNT(*) FROM baseline_stats")
+    if cursor.fetchone()[0] > 0:
+        conn.close()
+        return
 
     for cat in ["food", "fashion", "tech", "travel", "beauty", "fitness", "lifestyle", "home"]:
         compute_for_category(cursor, cat)
@@ -187,7 +182,3 @@ def main():
     conn.commit()
     conn.close()
     print("所有 baseline 统计指标已计算完毕")
-
-
-if __name__ == "__main__":
-    main()

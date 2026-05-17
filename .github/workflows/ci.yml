@@ -21,10 +21,7 @@ jobs:
       - run: python -c "from app.main import app; print('import ok')"
       - name: Init test DB
         run: |
-          cd ..
-          python scripts/init_db.py
-          python scripts/seed_data.py
-          python scripts/compute_baseline.py
+          python -c "from app.database import init_database; from app.main import DB_PATH; init_database(DB_PATH)"
       - run: python -m pytest tests/ -v --tb=short
 
   frontend:
