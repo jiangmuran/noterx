@@ -126,7 +126,9 @@ def _extract_wav_segment(video_path: str, *, start_sec: float, clip_sec: float) 
             check=False,
         )
         if proc.returncode != 0:
-            err = (proc.stderr or b"").decode("utf-8", errors="replace")[:400]
+            err_raw = (proc.stderr or b"").decode("utf-8", errors="replace")
+            # 头部多为版本信息，真实错误常在尾部；输出尾部更利于定位。
+            err = err_raw[-1000:] if err_raw else ""
             logger.warning("VIDEO_STT: ffmpeg 片段提取失败 rc=%s %s", proc.returncode, err)
             return b""
         with open(wav_path, "rb") as wf:
@@ -274,17 +276,18 @@ async def _transcribe_single_wav(
     return _transcription_text_from_response(resp)
 
 
-async def transcribe_video_with_whisper(video_bytes: bytes, container_suffix: str) -> str:
+async def transcribe_video_with_whisper(video_bytes: bytes, container_suffix: str) -> tuple[str, str]:
     """
     异步：线程池提取 WAV + AsyncOpenAI Whisper 转写。
-    @returns 转写文本，失败或未开启时为空字符串
+    @returns (转写文本, 状态码)
+      status: ok | disabled | missing_config | extract_failed | api_error | empty_text
     """
     if not _stt_enabled():
-        return ""
+        return "", "disabled"
 
     key, base = _resolve_whisper_client_config()
     if not key or not base:
-        return ""
+        return "", "missing_config"
 
     model = (os.getenv("WHISPER_MODEL") or "whisper-1").strip()
 
@@ -293,7 +296,7 @@ async def transcribe_video_with_whisper(video_bytes: bytes, container_suffix: st
         logger.warning(
             "VIDEO_STT: WAV 片段为空，未调用转写 API（检查 ffmpeg、视频是否含音轨、上方 stderr 日志）",
         )
-        return ""
+        return "", "extract_failed"
 
     import httpx
     from openai import AsyncOpenAI
@@ -336,12 +339,13 @@ async def transcribe_video_with_whisper(video_bytes: bytes, container_suffix: st
         merged = _join_transcript_parts(texts)
         if merged:
             logger.info("VIDEO_STT: 全片转写成功 chunks=%s total_len=%s model=%s", total, len(merged), model)
+            return merged, "ok"
         else:
             logger.warning("VIDEO_STT: 全片转写为空，请核对 ASR 模型与音频内容")
-        return merged
+            return "", "empty_text"
     except Exception as e:
         logger.warning("VIDEO_STT: 转写 API 失败 %s", e)
-        return ""
+        return "", "api_error"
     finally:
         await http_client.aclose()
 

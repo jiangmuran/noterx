@@ -20,6 +20,15 @@ function fkey(f: File) {
   return `${f.name}_${f.size}_${f.lastModified}`;
 }
 
+function looksLikeVideoWeakBody(text?: string) {
+  const s = (text || "").trim();
+  if (!s) return true;
+  const lines = s.split("\n").map((x) => x.trim()).filter(Boolean);
+  if (lines.length === 0) return true;
+  if (lines.length === 1 && lines[0].length <= 8) return true;
+  return false;
+}
+
 /** 中文垂类 -> 英文 key 映射 */
 const CAT_MAP: Record<string, string> = {
   "美食": "food", "食谱": "food", "做饭": "food", "烘焙": "food",
@@ -214,7 +223,10 @@ export default function Home() {
     for (const [, r] of successRecogEntries) {
       if ((r.slot_type || "").toLowerCase() === "content") {
         if (!bestTitle && r.title?.trim()) bestTitle = r.title.trim();
-        if (r.content_text?.trim()) contentParts.push(r.content_text.trim());
+        if (r.content_text?.trim()) {
+          const weakVideoBody = r.media_source === "video" && looksLikeVideoWeakBody(r.content_text);
+          if (!weakVideoBody) contentParts.push(r.content_text.trim());
+        }
       }
       if (!bestCategory && r.category?.trim()) bestCategory = r.category.trim();
       if (!bestSummary && r.summary?.trim()) bestSummary = r.summary.trim();
@@ -235,7 +247,10 @@ export default function Home() {
     }
     if (contentParts.length === 0) {
       for (const [, r] of successRecogEntries) {
-        if (r.content_text?.trim()) contentParts.push(r.content_text.trim());
+        if (r.content_text?.trim()) {
+          const weakVideoBody = r.media_source === "video" && looksLikeVideoWeakBody(r.content_text);
+          if (!weakVideoBody) contentParts.push(r.content_text.trim());
+        }
       }
     }
 
@@ -266,7 +281,13 @@ export default function Home() {
         bestTitle = (firstPhrase || s).slice(0, 100);
       }
     }
-    if (!bestContent.trim() && bestSummary.trim()) {
+    // 仅视频快识时，summary 常是画面概括，不能冒充正文
+    if (
+      !bestContent.trim()
+      && bestSummary.trim()
+      && !videoOnlySuccess
+      && !looksLikeVideoWeakBody(bestSummary)
+    ) {
       bestContent = bestSummary.trim();
     }
 
@@ -328,6 +349,7 @@ export default function Home() {
   }, [aggregated, userEdited]);
 
   const allFailed = allRecognitionDone && successResults.length === 0 && allResults.length > 0;
+  const anyFailed = allRecognitionDone && allResults.some((r) => !r.success);
 
   /** 全部失败时展示后端/模型返回的首条原因，便于区分「连不上 API」与「Key/模型报错」 */
   const firstRecognizeError = useMemo(() => {
@@ -746,7 +768,7 @@ export default function Home() {
             </AnimatePresence>
 
             {/* Ready state：仅在有成功识别时显示完成提示；全部失败只显示下方红字 */}
-            {isReady && files.length > 0 && hasRecogSuccess && (
+            {isReady && files.length > 0 && hasRecogSuccess && !anyFailed && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, px: 0.5 }}>
                 <CheckCircleIcon sx={{ fontSize: 13, color: "#16a34a" }} />
                 <Typography sx={{ fontSize: 11, color: "#16a34a", fontWeight: 600 }}>分析完成，可以开始诊断</Typography>
@@ -757,6 +779,11 @@ export default function Home() {
                 {firstRecognizeError
                   ? `识别失败：${firstRecognizeError}`
                   : "识别失败，请检查网络或手动输入"}
+              </Typography>
+            )}
+            {!allFailed && anyFailed && firstRecognizeError && (
+              <Typography sx={{ fontSize: 11, color: "#dc2626", px: 0.5, lineHeight: 1.5 }}>
+                {`部分素材识别失败：${firstRecognizeError}`}
               </Typography>
             )}
 

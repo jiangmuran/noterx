@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 from io import BytesIO
 from typing import Optional
 
@@ -31,6 +32,11 @@ from app.api.diagnose import (
 router = APIRouter()
 logger = logging.getLogger("noterx.screenshot")
 
+_MIMO_BASES = (
+    "https://api.xiaomimimo.com/v1",
+    "https://api.mimo-v2.com/v1",
+)
+
 
 def _env_int(name: str, default: int, *, min_v: int, max_v: int) -> int:
     """读取整数环境变量并夹紧到 [min_v, max_v]。"""
@@ -48,6 +54,84 @@ def _env_float(name: str, default: float, *, min_v: float, max_v: float) -> floa
     except ValueError:
         v = default
     return max(min_v, min(v, max_v))
+
+
+def _looks_like_connection_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    if "connection error" in msg:
+        return True
+    if "connect" in msg and "error" in msg:
+        return True
+    if "dns" in msg or "name resolution" in msg:
+        return True
+    if "timed out" in msg:
+        return True
+    n = exc.__class__.__name__.lower()
+    return "connection" in n or "connect" in n or "timeout" in n
+
+
+def _humanize_connection_error(raw: object) -> str:
+    detail = str(raw or "").strip()
+    base = (os.getenv("OPENAI_BASE_URL") or "").strip() or "https://api.openai.com/v1"
+    return (
+        "连接 AI 网关失败。请检查网络与网关配置："
+        f"OPENAI_BASE_URL={base}。"
+        "若使用 MiMo，可尝试切换到 https://api.mimo-v2.com/v1 或 https://api.xiaomimimo.com/v1。"
+        + (f" 原始错误: {detail}" if detail else "")
+    )
+
+
+def _mimo_fallback_base_urls() -> list[str]:
+    cur = (os.getenv("OPENAI_BASE_URL") or "").strip().rstrip("/")
+    extra = (os.getenv("OPENAI_BASE_URL_FALLBACK") or "").strip().rstrip("/")
+    out: list[str] = []
+    for base in (extra, *_MIMO_BASES):
+        if not base:
+            continue
+        if base == cur:
+            continue
+        if base in out:
+            continue
+        out.append(base)
+    return out
+
+
+async def _retry_chat_with_fallback_mimo(
+    kwargs: dict,
+    *,
+    timeout_sec: Optional[float] = None,
+) -> object | None:
+    """
+    当当前网关连接失败时，尝试备用 MiMo 域名重试一次请求。
+    """
+    if not _is_mimo_openai_compat():
+        return None
+    key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if not key:
+        return None
+
+    import httpx
+    from openai import AsyncOpenAI
+
+    for base in _mimo_fallback_base_urls():
+        http_client = httpx.AsyncClient(
+            proxy=None,
+            trust_env=False,
+            timeout=httpx.Timeout(120.0, connect=30.0),
+        )
+        try:
+            alt = AsyncOpenAI(api_key=key, base_url=base, http_client=http_client)
+            if timeout_sec is not None:
+                resp = await asyncio.wait_for(alt.chat.completions.create(**kwargs), timeout=timeout_sec)
+            else:
+                resp = await alt.chat.completions.create(**kwargs)
+            logger.info("快识请求已切换备用网关成功: %s", base)
+            return resp
+        except Exception as e:
+            logger.warning("备用网关调用失败 %s: %s", base, e)
+        finally:
+            await http_client.aclose()
+    return None
 
 
 def _quick_image_max_out_tokens() -> int:
@@ -323,6 +407,15 @@ async def _vision_call(
         )
     except asyncio.TimeoutError:
         return {"error": "视觉识别超时(60s)", "slot_type": "other"}
+    except Exception as e:
+        if _looks_like_connection_error(e):
+            retry = await _retry_chat_with_fallback_mimo(kwargs, timeout_sec=60)
+            if retry is not None:
+                resp = retry
+            else:
+                return {"error": _humanize_connection_error(e), "slot_type": "other"}
+        else:
+            return {"error": str(e), "slot_type": "other"}
     raw = resp.choices[0].message.content or ""
     # Try multiple JSON extraction strategies
     clean = raw.strip()
@@ -406,6 +499,54 @@ def _content_text_looks_like_video_scene_caption(text: str) -> bool:
     return False
 
 
+def _looks_like_video_player_meta_line(line: str) -> bool:
+    """
+    判断是否为播放器浮层/控制条噪声（时间轴、分辨率、倍速等）。
+    """
+    s = str(line or "").strip()
+    if not s:
+        return True
+
+    # 00:00/00:52, 1:23 / 10:02 等时间轴格式
+    if re.fullmatch(r"\d{1,2}:\d{2}\s*/\s*\d{1,2}:\d{2}", s):
+        return True
+    # 单独时间（常见于控制条）
+    if re.fullmatch(r"\d{1,2}:\d{2}", s):
+        return True
+    # 分辨率/清晰度
+    if re.fullmatch(r"\d{3,4}p", s, flags=re.IGNORECASE):
+        return True
+    if re.fullmatch(r"(HD|FHD|UHD|4K|2K|8K)", s, flags=re.IGNORECASE):
+        return True
+    # 倍速
+    if re.fullmatch(r"\d(?:\.\d+)?x", s, flags=re.IGNORECASE):
+        return True
+
+    meta_kw = (
+        "播放",
+        "暂停",
+        "全屏",
+        "画中画",
+        "静音",
+        "音量",
+        "倍速",
+        "清晰度",
+        "上一集",
+        "下一集",
+        "重播",
+        "进度",
+        "拖动",
+    )
+    if any(k in s for k in meta_kw):
+        return True
+
+    # 只含数字+符号（常见控制条残片）
+    if re.fullmatch(r"[\d:/.\-_%\s]+", s):
+        return True
+
+    return False
+
+
 def _strip_video_scene_caption_lines(text: str) -> str:
     """
     清除内容中的「画面描述型」旁白行，仅保留逐字字幕/口播文本。
@@ -418,7 +559,12 @@ def _strip_video_scene_caption_lines(text: str) -> str:
     if not lines:
         return ""
 
-    kept = [ln for ln in lines if not _content_text_looks_like_video_scene_caption(ln)]
+    kept = [
+        ln
+        for ln in lines
+        if not _content_text_looks_like_video_scene_caption(ln)
+        and not _looks_like_video_player_meta_line(ln)
+    ]
     if kept:
         return "\n".join(kept).strip()
     return ""
@@ -474,6 +620,21 @@ def _coerce_video_quick_slot_when_body_present(result: dict) -> None:
         return
     if st != "content":
         result["slot_type"] = "content"
+
+
+def _video_body_is_too_short_to_use(text: str) -> bool:
+    """
+    仅有极短钩子词时（如“注意看”），不应当作视频正文自动回填。
+    """
+    s = str(text or "").strip()
+    if not s:
+        return True
+    lines = [ln.strip() for ln in s.splitlines() if ln.strip()]
+    if not lines:
+        return True
+    if len(lines) == 1 and len(lines[0]) <= 8:
+        return True
+    return False
 
 
 def _quick_payload_is_empty(result: dict) -> bool:
@@ -570,6 +731,143 @@ def _merge_stt_into_video_result(result: dict, stt: str) -> None:
     result["content_text"] = f"{prev}\n\n{text}".strip()
 
 
+def _extract_video_text_frames(
+    video_bytes: bytes,
+    container_suffix: str,
+    *,
+    max_frames: int = 4,
+) -> list[bytes]:
+    """
+    从视频中均匀抽取多帧，用于字幕/花字兜底提取。
+    """
+    try:
+        import cv2
+    except Exception:
+        logger.warning("视频字幕兜底：OpenCV unavailable")
+        return []
+
+    suffix = container_suffix if container_suffix.startswith(".") else f".{container_suffix}"
+    temp_path = ""
+    out: list[bytes] = []
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+            f.write(video_bytes)
+            temp_path = f.name
+
+        cap = cv2.VideoCapture(temp_path)
+        if not cap.isOpened():
+            cap.release()
+            return []
+
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        picks: list[int] = []
+        n = max(1, min(max_frames, 8))
+        if total_frames > 0:
+            # 避开首尾，均匀取样
+            for i in range(n):
+                ratio = (i + 1) / (n + 1)
+                idx = int(total_frames * ratio)
+                picks.append(max(0, min(idx, total_frames - 1)))
+        else:
+            # 帧数未知时按步进读
+            picks = [0, 30, 60, 90][:n]
+
+        seen: set[int] = set()
+        for idx in picks:
+            if idx in seen:
+                continue
+            seen.add(idx)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ok, frame = cap.read()
+            if not ok or frame is None or getattr(frame, "size", 0) <= 0:
+                continue
+            enc_ok, enc = cv2.imencode(".jpg", frame)
+            if not enc_ok:
+                continue
+            out.append(enc.tobytes())
+        cap.release()
+        return out
+    except Exception as e:
+        logger.warning("视频字幕兜底：抽帧失败 %s", e)
+        return []
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+
+def _parse_lines_from_frame_result(raw: dict) -> list[str]:
+    """
+    解析单帧识别结果中的文本行。
+    """
+    if not isinstance(raw, dict):
+        return []
+    lines_obj = raw.get("lines")
+    out: list[str] = []
+    if isinstance(lines_obj, list):
+        cands = [str(x).strip() for x in lines_obj if str(x).strip()]
+    else:
+        cands = []
+        for k in ("content_text", "text", "subtitle", "summary"):
+            v = str(raw.get(k, "")).strip()
+            if v:
+                cands.extend([ln.strip() for ln in v.split("\n") if ln.strip()])
+
+    for ln in cands:
+        if _looks_like_video_player_meta_line(ln):
+            continue
+        if _content_text_looks_like_video_scene_caption(ln):
+            continue
+        if len(ln) <= 1:
+            continue
+        out.append(ln)
+    return out
+
+
+async def _recover_video_text_from_frames(
+    client,
+    video_bytes: bytes,
+    container_ext: str,
+) -> str:
+    """
+    STT 不可用时，多帧提取画面字幕/花字作为正文兜底。
+    """
+    max_frames = _env_int("VIDEO_TEXT_FRAME_FALLBACK_FRAMES", 4, min_v=2, max_v=8)
+    frames = _extract_video_text_frames(video_bytes, container_ext, max_frames=max_frames)
+    if not frames:
+        return ""
+
+    prompt = (
+        "你是视频字幕提取助手。只提取画面上实际可见的字幕/花字/贴纸文字。"
+        "禁止场景描述，禁止输出播放器UI（时间轴、1080P、倍速、播放按钮等）。"
+        "只输出 JSON：{\"lines\": [\"...\", \"...\"]}"
+    )
+    sem = asyncio.Semaphore(2)
+
+    async def _one(img: bytes) -> list[str]:
+        async with sem:
+            res = await _vision_call(
+                client,
+                prompt,
+                img,
+                max_out_tokens=512,
+                image_mime="image/jpeg",
+            )
+            return _parse_lines_from_frame_result(res if isinstance(res, dict) else {})
+
+    chunks = await asyncio.gather(*[_one(f) for f in frames], return_exceptions=True)
+    merged: list[str] = []
+    for x in chunks:
+        if isinstance(x, Exception):
+            continue
+        for ln in x:
+            if ln not in merged:
+                merged.append(ln)
+    return "\n".join(merged).strip()
+
+
 async def _video_url_quick_call(client, video_url: str) -> dict:
     """
     通过 MiMo 视频理解（video_url content part）请求模型，返回与快识相同结构的 JSON。
@@ -605,7 +903,16 @@ async def _video_url_quick_call(client, video_url: str) -> dict:
     else:
         kwargs["max_tokens"] = out_cap
 
-    resp = await client.chat.completions.create(**kwargs)
+    try:
+        resp = await client.chat.completions.create(**kwargs)
+    except Exception as e:
+        if _looks_like_connection_error(e):
+            retry = await _retry_chat_with_fallback_mimo(kwargs)
+            if retry is None:
+                return {"error": _humanize_connection_error(e), "slot_type": "other"}
+            resp = retry
+        else:
+            return {"error": str(e), "slot_type": "other"}
     raw = (resp.choices[0].message.content or "").strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -655,7 +962,18 @@ async def _video_url_subtitle_transcript_call(client, video_url: str) -> list[st
     else:
         kwargs["max_tokens"] = out_cap
 
-    resp = await client.chat.completions.create(**kwargs)
+    try:
+        resp = await client.chat.completions.create(**kwargs)
+    except Exception as e:
+        if _looks_like_connection_error(e):
+            retry = await _retry_chat_with_fallback_mimo(kwargs)
+            if retry is None:
+                logger.warning("视频专向听写连接失败: %s", _humanize_connection_error(e))
+                return []
+            resp = retry
+        else:
+            logger.warning("视频专向听写失败: %s", e)
+            return []
     raw = (resp.choices[0].message.content or "").strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -929,15 +1247,17 @@ async def quick_recognize_video(request: Request, file: UploadFile = File(...)):
         await _ocr_supplement_quick_result(client, frame_jpeg, result, ocr_cap)
 
     stt_text = ""
+    stt_status = "unknown"
     try:
         _stt_t = float(os.getenv("VIDEO_STT_TIMEOUT_SEC", "240"))
     except ValueError:
         _stt_t = 240.0
     stt_timeout = max(30.0, min(_stt_t, 600.0))
     try:
-        stt_text = await asyncio.wait_for(stt_task, timeout=stt_timeout)
+        stt_text, stt_status = await asyncio.wait_for(stt_task, timeout=stt_timeout)
     except asyncio.TimeoutError:
         logger.warning("VIDEO_STT: Whisper 等待超时（%.0fs）", stt_timeout)
+        stt_status = "timeout"
         stt_task.cancel()
         try:
             await stt_task
@@ -945,6 +1265,7 @@ async def quick_recognize_video(request: Request, file: UploadFile = File(...)):
             pass
     except Exception as e:
         logger.warning("VIDEO_STT: 合并前异常 %s", e)
+        stt_status = "error"
 
     _prev_ct_len = len(str(result.get("content_text", "") or ""))
     _merge_stt_into_video_result(result, stt_text)
@@ -961,18 +1282,52 @@ async def quick_recognize_video(request: Request, file: UploadFile = File(...)):
         "yes",
         "on",
     )
-    if not (stt_text or "").strip() and _stt_env_on:
+    stt_ok = bool((stt_text or "").strip())
+    if not stt_ok and _stt_env_on:
         logger.warning(
             "VIDEO_STT: 口播转写为空，正文仍主要来自视频模型/OCR；"
             "请看上方 VIDEO_STT 日志（ffmpeg、API、代理已改为 trust_env=False 直连）",
         )
 
     _sanitize_video_meta_narrative_content(result)
+    body_after_stt = str(result.get("content_text", "")).strip()
+
+    # STT 没拿到文本时，避免把“注意看”之类短钩子误当正文自动填入。
+    if not stt_ok and _video_body_is_too_short_to_use(body_after_stt):
+        # 二次兜底：多帧抽取字幕/花字，尽量恢复视频正文
+        recovered = await _recover_video_text_from_frames(client, video_bytes, container_ext)
+        recovered_ok = bool(recovered and not _video_body_is_too_short_to_use(recovered))
+        if recovered_ok:
+            result["content_text"] = recovered
+            body_after_stt = recovered
+            logger.info("视频多帧字幕兜底成功 len=%s", len(recovered))
+        else:
+            if recovered:
+                logger.info("视频多帧字幕兜底结果过短，丢弃 len=%s", len(recovered))
+            else:
+                logger.info("视频多帧字幕兜底未提取到有效文本")
+            result["content_text"] = ""
+            body_after_stt = ""
+        t = str(result.get("title", "")).strip()
+        if t and _video_body_is_too_short_to_use(t):
+            result["title"] = ""
+        s = str(result.get("summary", "")).strip()
+        if s and _video_body_is_too_short_to_use(s):
+            result["summary"] = ""
 
     if _quick_payload_is_empty(result):
+        detail = (
+            "无法从视频中识别有效文字或主题，请换片段或手动填写"
+            if stt_ok
+            else (
+                "视频语音转写未获取到有效正文。"
+                f"（stt_status={stt_status}）请检查 ffmpeg、OPENAI_WHISPER_BASE_URL、"
+                "OPENAI_WHISPER_API_KEY、WHISPER_MODEL，或上传含清晰字幕/口播的视频。"
+            )
+        )
         return {
             "success": False,
-            "error": "无法从视频中识别有效文字或主题，请换片段或手动填写",
+            "error": detail,
             "media_source": "video",
             "slot_type": "other",
             "extra_slots": [],

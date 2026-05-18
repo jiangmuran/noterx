@@ -10,6 +10,7 @@ from app.api.screenshot_api import (
     _strip_video_scene_caption_lines,
     _merge_stt_into_video_result,
     _video_subtitle_payload_insufficient,
+    _video_body_is_too_short_to_use,
 )
 
 
@@ -30,3 +31,14 @@ def test_merge_stt_replaces_scene_caption_only_payload():
 def test_video_payload_insufficient_when_only_scene_caption():
     result = {"content_text": "视频帧显示一位女士在厨房烹饪蘑菇，并叠加字幕提示不要焯水"}
     assert _video_subtitle_payload_insufficient(result) is True
+
+
+def test_strip_player_overlay_noise_lines():
+    text = "注意看\n00:00/00:52\n1080P"
+    cleaned = _strip_video_scene_caption_lines(text)
+    assert cleaned == "注意看"
+
+
+def test_short_video_hook_body_not_usable():
+    assert _video_body_is_too_short_to_use("注意看") is True
+    assert _video_body_is_too_short_to_use("第一步先热锅\n再下油") is False

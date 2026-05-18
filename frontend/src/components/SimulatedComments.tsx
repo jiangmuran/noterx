@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
+import axios from "axios";
 import { Box, Typography, Button, CircularProgress } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import type { SimulatedComment, CommentWithReplies } from "../utils/api";
 import { generateComments } from "../utils/api";
+import { showToast } from "./Toast";
 
 interface Props {
   comments: SimulatedComment[];
@@ -77,11 +79,40 @@ export default function SimulatedComments({ comments: initial, noteTitle = "", n
   }, []);
 
   const handleLoadMore = async () => {
+    // #region agent log
+    fetch("http://127.0.0.1:7868/ingest/76f492e9-821a-40ed-94f3-44f287746ef5", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "7caaea" }, body: JSON.stringify({ sessionId: "7caaea", runId: "pre-fix", hypothesisId: "D", location: "SimulatedComments.tsx:handleLoadMore:entry", message: "load more clicked", data: { commentsLen: comments.length }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
     setLoading(true);
+    const req = { title: noteTitle, content: noteContent, category: noteCategory, existing_count: comments.length };
+    // #region agent log
+    fetch("http://127.0.0.1:7868/ingest/76f492e9-821a-40ed-94f3-44f287746ef5", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "7caaea" }, body: JSON.stringify({ sessionId: "7caaea", runId: "pre-fix", hypothesisId: "C", location: "SimulatedComments.tsx:handleLoadMore:req", message: "generateComments params", data: { titleLen: req.title?.length ?? 0, contentLen: req.content?.length ?? 0, category: req.category, existing_count: req.existing_count }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
     try {
-      const nc = await generateComments({ title: noteTitle, content: noteContent, category: noteCategory, existing_count: comments.length });
+      const nc = await generateComments(req);
+      // #region agent log
+      fetch("http://127.0.0.1:7868/ingest/76f492e9-821a-40ed-94f3-44f287746ef5", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "7caaea" }, body: JSON.stringify({ sessionId: "7caaea", runId: "pre-fix", hypothesisId: "B,E", location: "SimulatedComments.tsx:handleLoadMore:success", message: "generateComments result", data: { isArray: Array.isArray(nc), count: Array.isArray(nc) ? nc.length : null, type: typeof nc }, timestamp: Date.now() }) }).catch(() => {});
+      // #endregion
+      if (!nc?.length) {
+        showToast("未能生成新评论，请稍后重试");
+        return;
+      }
       setComments((prev) => [...prev, ...nc.map(toCommentState)]);
-    } catch { /* ignore */ } finally { setLoading(false); }
+    } catch (err) {
+      let msg = "加载评论失败，请稍后重试";
+      if (axios.isAxiosError(err)) {
+        const d = err.response?.data;
+        if (d && typeof d === "object" && "detail" in d) {
+          const det = (d as { detail: unknown }).detail;
+          msg = typeof det === "string" ? det : msg;
+        }
+      } else if (err instanceof Error && err.message) {
+        msg = err.message;
+      }
+      showToast(msg);
+      // #region agent log
+      fetch("http://127.0.0.1:7868/ingest/76f492e9-821a-40ed-94f3-44f287746ef5", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "7caaea" }, body: JSON.stringify({ sessionId: "7caaea", runId: "post-fix", hypothesisId: "A,E", location: "SimulatedComments.tsx:handleLoadMore:catch", message: "generateComments failed", data: { err: msg }, timestamp: Date.now() }) }).catch(() => {});
+      // #endregion
+    } finally { setLoading(false); }
   };
 
   if (!comments.length) return <Typography sx={{ fontSize: 14, color: "#999" }}>暂无模拟评论</Typography>;

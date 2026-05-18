@@ -4,8 +4,9 @@
 """
 import json
 import logging
+import time
 from pydantic import BaseModel
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.agents.base_agent import BaseAgent, MODEL_FAST
 
@@ -68,7 +69,50 @@ async def generate_comments(req: GenerateCommentsRequest):
     result = await agent.call_llm(user_msg, max_tokens=2000)
 
     result.pop("_meta", None)
+
+    if result.get("dimension") == "error":
+        issues = result.get("issues") or []
+        detail = issues[0] if issues else result.get("reasoning", "评论生成失败")
+        # #region agent log
+        try:
+            with open("/Users/yxz/Desktop/projects/小红书黑客松/noterx/.cursor/debug-7caaea.log", "a", encoding="utf-8") as _df:
+                _df.write(json.dumps({
+                    "sessionId": "7caaea",
+                    "runId": "post-fix",
+                    "hypothesisId": "B",
+                    "location": "comments_api.py:generate_comments:error",
+                    "message": "llm error raised to client",
+                    "data": {"detail": str(detail)[:200]},
+                    "timestamp": int(time.time() * 1000),
+                }, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+        # #endregion
+        raise HTTPException(status_code=503, detail=str(detail))
+
     comments = result.get("comments", [])
+
+    # #region agent log
+    try:
+        with open("/Users/yxz/Desktop/projects/小红书黑客松/noterx/.cursor/debug-7caaea.log", "a", encoding="utf-8") as _df:
+            _df.write(json.dumps({
+                "sessionId": "7caaea",
+                "runId": "pre-fix",
+                "hypothesisId": "A,B",
+                "location": "comments_api.py:generate_comments",
+                "message": "generate_comments llm result",
+                "data": {
+                    "existing_count": req.existing_count,
+                    "title_len": len(req.title or ""),
+                    "raw_keys": list(result.keys())[:12],
+                    "has_error_dimension": result.get("dimension") == "error",
+                    "comments_count": len(comments) if isinstance(comments, list) else -1,
+                },
+                "timestamp": int(time.time() * 1000),
+            }, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+    # #endregion
 
     formatted = []
     for c in comments:
