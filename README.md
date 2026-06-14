@@ -108,12 +108,6 @@ make install && make data && ./start.sh
 
 访问 `http://localhost:5173`
 
-## 团队
-
-**PageOne** — 全场唯一中学生队伍。四个 13 岁的初中生，从零完成数据采集、模型训练、全栈开发到生产部署，48 小时交付完整产品。
-
-姜睦然 · 杨曦哲 · 陈宇夏 · 吕思彤
-
 ## License
 
 Apache License 2.0
