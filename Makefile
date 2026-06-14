@@ -2,9 +2,11 @@
 
 # 一键初始化数据库并生成 baseline
 data:
-	python3 scripts/init_db.py
-	python3 scripts/seed_data.py
-	python3 scripts/compute_baseline.py
+	cd backend && python3 -c "from app.database import init_database; from pathlib import Path; init_database(Path('data') / 'baseline.db')"
+
+# 清空种子和基线后重新初始化
+data-refresh:
+	cd backend && python3 -c "from app.database import init_database; from pathlib import Path; init_database(Path('data') / 'baseline.db', force=True)"
 
 # 安装所有依赖
 install:

@@ -89,10 +89,7 @@ run(ssh, f"{REMOTE_DIR}/backend/venv/bin/pip install --upgrade pip -q")
 run(ssh, f"{REMOTE_DIR}/backend/venv/bin/pip install -r {REMOTE_DIR}/backend/requirements.txt")
 
 # Init DB
-print("  Initializing database...")
-run(ssh, f"cd {REMOTE_DIR} && {REMOTE_DIR}/backend/venv/bin/python scripts/init_db.py", check=False)
-run(ssh, f"cd {REMOTE_DIR} && {REMOTE_DIR}/backend/venv/bin/python scripts/seed_data.py", check=False)
-run(ssh, f"cd {REMOTE_DIR} && {REMOTE_DIR}/backend/venv/bin/python scripts/compute_baseline.py", check=False)
+print("  Database tables / seed data / baseline will be handled by app startup")
 
 # Upload .env
 print("  Uploading .env...")
