@@ -136,6 +136,7 @@ def _sign_temp_video(file_name: str, exp: int) -> str:
 def _cleanup_expired_temp_videos(now_ts: Optional[int] = None) -> None:
     _ensure_temp_video_dir()
     now = now_ts or int(time.time())
+    items = []
     for item in TEMP_VIDEO_DIR.iterdir():
         if not item.is_file():
             continue
@@ -147,9 +148,18 @@ def _cleanup_expired_temp_videos(now_ts: Optional[int] = None) -> None:
             exp = int(exp_str)
         except ValueError:
             continue
-        if exp < now - 60:
+        items.append((item, exp))
+    items.sort(key=lambda x: x[1])
+    total_bytes = sum(it[0].stat().st_size for it in items)
+    max_total_mb = int(os.getenv("TEMP_VIDEO_DIR_MAX_TOTAL_MB", "4096"))
+    max_total_mb = max(10, min(max_total_mb, 32768))
+    max_total_bytes = max_total_mb * 1024 * 1024
+    for item, exp in items:
+        if exp < now - 60 or total_bytes > max_total_bytes:
             try:
+                size = item.stat().st_size
                 item.unlink(missing_ok=True)
+                total_bytes -= size
             except Exception:
                 logger.warning("Failed to delete expired temp video: %s", item)
 
@@ -337,6 +347,23 @@ async def get_temp_video(
 
 # ─── Main diagnose endpoint ───
 
+_MAX_TITLE_LENGTH = int(os.getenv("MAX_TITLE_LENGTH", "200"))
+_MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", "10000"))
+_MAX_CATEGORY_LENGTH = int(os.getenv("MAX_CATEGORY_LENGTH", "50"))
+_MAX_TAGS_LENGTH = int(os.getenv("MAX_TAGS_LENGTH", "500"))
+
+
+def _validate_input_fields(title: str, content: str, category: str, tags: str) -> None:
+    if len(title) > _MAX_TITLE_LENGTH:
+        raise HTTPException(400, f"标题长度不能超过 {_MAX_TITLE_LENGTH} 字符")
+    if len(content) > _MAX_CONTENT_LENGTH:
+        raise HTTPException(400, f"正文长度不能超过 {_MAX_CONTENT_LENGTH} 字符")
+    if len(category) > _MAX_CATEGORY_LENGTH:
+        raise HTTPException(400, f"品类名称过长")
+    if len(tags) > _MAX_TAGS_LENGTH:
+        raise HTTPException(400, f"标签过长")
+
+
 @router.post("/diagnose", response_model=DiagnoseResponse)
 async def diagnose_note(
     request: Request,
@@ -350,6 +377,8 @@ async def diagnose_note(
 ):
     """Receive note content and run multi-agent diagnosis."""
     from app.agents.orchestrator import Orchestrator
+
+    _validate_input_fields(title, content, category, tags)
 
     # Collect image files
     image_files: list[UploadFile] = []
@@ -475,6 +504,7 @@ async def pre_score_note(
     """Instant Model A pre-score (no LLM, pure math, <50ms)."""
     from app.agents.research_data import pre_score, MODEL_PARAMS, CATEGORY_CN
 
+    _validate_input_fields(title, content, category, tags)
     tag_count = len([t for t in tags.split(",") if t.strip()]) if tags else 0
     result = pre_score(title, content, category, tag_count, image_count)
     result["category"] = category
@@ -499,6 +529,8 @@ async def diagnose_stream(
     from starlette.responses import StreamingResponse
     from app.agents.orchestrator import Orchestrator
     from app.agents.research_data import pre_score as _pre_score
+
+    _validate_input_fields(title, content, category, tags)
 
     # Parse inputs (same as /diagnose)
     image_files: list[UploadFile] = []
